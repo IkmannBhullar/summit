@@ -23,8 +23,8 @@ export default function App() {
 
       {/* Both numbers come from packages/shared, so they stay in sync with the server. */}
       <p className="rounded-full bg-teal-100 px-4 py-2 text-sm font-medium text-teal-900 dark:bg-teal-900/40 dark:text-teal-200">
-        {METERS_PER_FOCUS_MINUTE} m per focus minute · a {EXAMPLE_SESSION_MINUTES}-minute session climbs{" "}
-        {metersForFocusMinutes(EXAMPLE_SESSION_MINUTES)} m
+        {METERS_PER_FOCUS_MINUTE} m per focus minute · a {EXAMPLE_SESSION_MINUTES}-minute session
+        climbs {metersForFocusMinutes(EXAMPLE_SESSION_MINUTES)} m
       </p>
     </main>
   );

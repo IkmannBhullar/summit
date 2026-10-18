@@ -18,7 +18,9 @@ describe("App", () => {
   it("shows elevation values from @summit/shared", () => {
     render(<App />);
 
-    expect(screen.getByText(new RegExp(`${METERS_PER_FOCUS_MINUTE} m per focus minute`))).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`${METERS_PER_FOCUS_MINUTE} m per focus minute`)),
+    ).toBeInTheDocument();
     expect(screen.getByText(/25-minute session climbs 250 m/)).toBeInTheDocument();
   });
 });

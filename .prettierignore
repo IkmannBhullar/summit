@@ -1,0 +1,8 @@
+# Files Prettier should never reformat.
+# (node_modules and anything in .gitignore are already skipped.)
+
+# npm manages this file; formatting it creates noisy diffs.
+package-lock.json
+
+# The project guide is kept exactly as written.
+CLAUDE.md
