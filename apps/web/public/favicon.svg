@@ -1,0 +1,5 @@
+<!-- Summit favicon: a simple two-peak mountain with a snowcap. Files in public/ are served as-is. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <path d="M2 28 L12 10 L17 18 L21 12 L30 28 Z" fill="#0f766e"/>
+  <path d="M12 10 L15.2 15.8 L13.4 14.6 L11.6 16.2 L10.2 13.2 Z" fill="#f8fafc"/>
+</svg>

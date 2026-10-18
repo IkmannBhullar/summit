@@ -1,0 +1,15 @@
+// TypeScript config for apps/web (React in the browser).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Add browser APIs (document, window, fetch...) on top of the base ES2023 lib.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Use React's automatic JSX runtime: no need to `import React` in every file.
+    "jsx": "react-jsx",
+    // Vite's types let TypeScript understand `import.meta.env` and
+    // imports of non-code files like .css and .svg.
+    "types": ["vite/client"]
+  },
+  // App source, tests, and the Vite config itself.
+  "include": ["src", "vite.config.ts"]
+}

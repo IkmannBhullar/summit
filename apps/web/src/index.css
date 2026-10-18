@@ -1,0 +1,4 @@
+/* Tailwind v4: this one import pulls in Tailwind's base styles and utility
+   classes. There's no tailwind.config.js; customization goes in this file
+   (with @theme) when we need it. */
+@import "tailwindcss";
