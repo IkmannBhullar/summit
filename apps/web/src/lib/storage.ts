@@ -12,9 +12,10 @@
 const KEY_PREFIX = "summit:";
 
 /**
- * Anything with a Zod-style `safeParse`. Describing just the shape we need
- * (instead of importing Zod's types) keeps the web app from depending on Zod
- * directly; it only uses the schemas exported by @summit/shared.
+ * Anything with a Zod-style `safeParse`. Describing just the shape we need,
+ * instead of requiring a Zod type, keeps these helpers independent of the
+ * validation library: any object with this method works, which also makes
+ * them easy to test.
  */
 export interface Schema<T> {
   safeParse(input: unknown): { success: true; data: T } | { success: false };
@@ -48,6 +49,34 @@ export function loadFromStorage<T>(key: string, schema: Schema<T>, fallback: T):
     return fallback;
   }
   return result.data;
+}
+
+/**
+ * Reads a stored list, validating each item separately.
+ *
+ * Unlike `loadFromStorage`, one bad entry doesn't throw away the whole list:
+ * a single corrupted session shouldn't erase months of history. Invalid
+ * items are dropped (with a warning) and the rest are kept.
+ *
+ * @returns The valid items, or an empty list if nothing usable is stored.
+ */
+export function loadListFromStorage<T>(key: string, itemSchema: Schema<T>): T[] {
+  const stored = loadFromStorage<unknown[]>(key, { safeParse: parseArray }, []);
+
+  const valid: T[] = [];
+  for (const item of stored) {
+    const result = itemSchema.safeParse(item);
+    if (result.success) valid.push(result.data);
+  }
+  if (valid.length < stored.length) {
+    console.warn(`Dropped ${stored.length - valid.length} invalid item(s) from "${key}"`);
+  }
+  return valid;
+}
+
+/** A minimal schema that accepts any array (items are checked one by one afterwards). */
+function parseArray(input: unknown): { success: true; data: unknown[] } | { success: false } {
+  return Array.isArray(input) ? { success: true, data: input as unknown[] } : { success: false };
 }
 
 /**

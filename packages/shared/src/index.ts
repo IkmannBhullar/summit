@@ -14,6 +14,7 @@ export {
   type ClimbProgress,
   type CurrentClimb,
 } from "./climb";
+export { progressFromSessions } from "./progress";
 export {
   FocusSessionSchema,
   metersEarned,

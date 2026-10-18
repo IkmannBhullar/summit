@@ -30,6 +30,12 @@ export interface UseFocusTimerOptions {
   onEvent?: (event: TimerEvent) => void;
   /** Creates ids for new sessions. Tests can inject a predictable one. */
   createId?: () => string;
+  /**
+   * State to start from, e.g. one restored after a page reload. Only read on
+   * the first render. If it's a running period whose time is already up, it
+   * completes immediately (at its scheduled end time).
+   */
+  initialState?: TimerState;
 }
 
 export interface FocusTimer {
@@ -51,8 +57,9 @@ export function useFocusTimer({
   settings,
   onEvent,
   createId = defaultCreateId,
+  initialState = INITIAL_TIMER_STATE,
 }: UseFocusTimerOptions): FocusTimer {
-  const [state, setState] = useState<TimerState>(INITIAL_TIMER_STATE);
+  const [state, setState] = useState<TimerState>(initialState);
   // The time of the latest check. Storing it in state (rather than calling
   // Date.now() while rendering) keeps rendering pure and lets each tick
   // trigger a re-render so the countdown moves.
@@ -95,6 +102,12 @@ export function useFocusTimer({
       onEventRef.current?.(event);
     }
   }, []);
+
+  // Check the clock once right away. For a restored session whose time ran
+  // out while the page was closed, this completes it straight away.
+  useEffect(() => {
+    dispatch({ type: "TICK", now: Date.now() });
+  }, [dispatch]);
 
   // While running, re-check the clock a few times per second.
   useEffect(() => {

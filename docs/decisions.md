@@ -222,3 +222,44 @@ React's rendering. Time is tracked only through `endsAt`.
 end-of-session sound or notification can arrive late in a long-hidden tab.
 Recorded times are always exact. Fully on-time background alerts would need
 server push.
+
+---
+
+## 011 — Climb progress is derived from session history, not stored
+
+_2026-10-17 · Phase 1_
+
+**Decision:** Only finished sessions are saved. Climb progress (meters per
+peak, summit dates) is rebuilt by replaying completed sessions, oldest first,
+through `applyMeters` (`progressFromSessions` in `packages/shared`).
+
+**Why:** One source of truth. Separately stored progress could disagree with
+history, for example if one of two writes failed or an old version saved a
+different shape. Replaying thousands of sessions takes well under a
+millisecond. In Phase 2, importing a guest's local history is a single list.
+
+**Alternatives considered:** _Store progress next to sessions:_ faster to
+read, but it duplicates data that can drift apart. The server can still
+cache it as the `Climb` table in Phase 2, with history as the source it's
+rebuilt from.
+
+---
+
+## 012 — Restoring a session after reload; ended-while-closed counts
+
+_2026-10-17 · Phase 1_
+
+**Decision:** The timer's state is saved to localStorage on every
+transition. On load it's restored and checked against the clock once. A
+running session whose time ran out while the page was closed is recorded
+as **completed**, with `endedAt` set to its scheduled end. Saved state is
+validated, including a rule that a running session's `endsAt` can't be
+earlier than `startedAt + durationMs`, which blocks a hand edit that
+finishes a session early.
+
+**Why:** A refresh or a sleeping laptop shouldn't cost a session. The
+clock ran its full course, and solo mode works on the honor system until
+the server decides in Phase 2.
+
+**Alternatives considered:** _Treat a reload as giving up:_ matches the
+rope-team rule, but it punishes accidental refreshes in solo mode.

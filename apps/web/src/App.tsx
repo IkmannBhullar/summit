@@ -1,15 +1,46 @@
-import { useState } from "react";
+import { progressFromSessions } from "@summit/shared";
+import { useCallback, useMemo, useState } from "react";
+import { ClimbSummary } from "./features/climb/ClimbSummary";
+import { HistoryList } from "./features/history/HistoryList";
+import { useSessionHistory } from "./features/history/useSessionHistory";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
 import { useSettings } from "./features/settings/useSettings";
+import type { TimerEvent } from "./features/timer/timerMachine";
 import { TimerScreen } from "./features/timer/TimerScreen";
+import { localDateKey } from "./lib/dates";
+import { useNow } from "./lib/useNow";
 
 /**
  * App shell: the page layout around the features, plus app-wide state
- * (settings) that more than one feature needs.
+ * (settings, session history) that more than one feature needs.
  */
 export default function App() {
   const [settings, saveSettings] = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { sessions, addSession } = useSessionHistory();
+  const now = useNow();
+
+  // Climb progress is derived from history, never stored separately
+  // (decision 011). useMemo re-computes it only when sessions change.
+  const progress = useMemo(() => progressFromSessions(sessions), [sessions]);
+
+  const todayKey = localDateKey(now);
+  const completedToday = sessions.filter(
+    (session) =>
+      session.status === "COMPLETED" &&
+      session.endedAt !== null &&
+      localDateKey(new Date(session.endedAt)) === todayKey,
+  ).length;
+
+  // Every finished focus session (completed or abandoned) goes into history.
+  const handleTimerEvent = useCallback(
+    (event: TimerEvent) => {
+      if (event.type === "focusCompleted" || event.type === "focusAbandoned") {
+        addSession(event.session);
+      }
+    },
+    [addSession],
+  );
 
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -28,8 +59,14 @@ export default function App() {
         </button>
       </header>
 
-      <main className="flex flex-1 flex-col items-center justify-center px-6 pb-16">
-        <TimerScreen settings={settings} />
+      <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
+        <ClimbSummary progress={progress} />
+        <TimerScreen
+          settings={settings}
+          onEvent={handleTimerEvent}
+          completedToday={completedToday}
+        />
+        <HistoryList sessions={sessions} now={now} />
       </main>
 
       <SettingsDialog

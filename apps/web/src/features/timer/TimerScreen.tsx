@@ -4,16 +4,23 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { formatClock } from "./formatClock";
 import { MODE_LABELS } from "./modeLabels";
 import type { TimerEvent } from "./timerMachine";
+import { loadTimerState, saveTimerState } from "./timerStorage";
 import { useFocusTimer } from "./useFocusTimer";
 
 export interface TimerScreenProps {
   settings?: TimerSettings;
-  /** Lets the parent react to timer events too (saving history comes in Step 5). */
+  /** Lets the parent react to timer events too (e.g. saving history). */
   onEvent?: (event: TimerEvent) => void;
+  /** Focus sessions completed today, shown under the clock. */
+  completedToday?: number;
 }
 
 /** The main timer: countdown, controls, and the give-up confirmation. */
-export function TimerScreen({ settings = DEFAULT_TIMER_SETTINGS, onEvent }: TimerScreenProps) {
+export function TimerScreen({
+  settings = DEFAULT_TIMER_SETTINGS,
+  onEvent,
+  completedToday = 0,
+}: TimerScreenProps) {
   // A short message about what just happened, announced to screen readers.
   const [message, setMessage] = useState<string | null>(null);
   const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
@@ -33,8 +40,16 @@ export function TimerScreen({ settings = DEFAULT_TIMER_SETTINGS, onEvent }: Time
     [onEvent],
   );
 
-  const timer = useFocusTimer({ settings, onEvent: handleEvent });
+  // Restore a session in progress from before a reload (read once, on mount).
+  const [restoredState] = useState(loadTimerState);
+  const timer = useFocusTimer({ settings, onEvent: handleEvent, initialState: restoredState });
   const { state, remainingMs, durationMs } = timer;
+
+  // Save the timer whenever its state changes, so a reload can pick it up.
+  // Only real transitions change `state`; the countdown ticking doesn't.
+  useEffect(() => {
+    saveTimerState(state);
+  }, [state]);
   const clock = formatClock(remainingMs);
   const isFocus = state.mode === "focus";
   const isActive = state.status !== "idle";
@@ -115,8 +130,7 @@ export function TimerScreen({ settings = DEFAULT_TIMER_SETTINGS, onEvent }: Time
             />
           ))}
         </span>
-        {state.completedFocusCount} {state.completedFocusCount === 1 ? "session" : "sessions"}{" "}
-        completed
+        {completedToday} {completedToday === 1 ? "session" : "sessions"} today
       </p>
 
       <div className="flex w-full flex-col gap-3 sm:flex-row sm:justify-center">

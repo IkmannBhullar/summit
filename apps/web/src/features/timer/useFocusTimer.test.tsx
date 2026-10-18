@@ -9,7 +9,7 @@ import { DEFAULT_TIMER_SETTINGS, type TimerSettings } from "@summit/shared";
 import { act, renderHook } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TimerEvent } from "./timerMachine";
+import type { TimerEvent, TimerState } from "./timerMachine";
 import { useFocusTimer, type UseFocusTimerOptions } from "./useFocusTimer";
 
 const MIN = 60_000;
@@ -210,5 +210,65 @@ describe("useFocusTimer", () => {
     unmount();
 
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("useFocusTimer restoring a saved session", () => {
+  /** A focus session that started at T0 and was saved while running. */
+  const savedRunning: TimerState = {
+    status: "running",
+    mode: "focus",
+    completedFocusCount: 0,
+    sessionId: ID,
+    startedAt: T0,
+    durationMs: 25 * MIN,
+    endsAt: T0 + 25 * MIN,
+  };
+
+  it("continues a session that is still in progress", () => {
+    vi.setSystemTime(T0 + 10 * MIN); // the page reloads 10 minutes in
+
+    const { result, onEvent } = setup({ initialState: savedRunning });
+
+    expect(result.current.state.status).toBe("running");
+    expect(result.current.remainingMs).toBe(15 * MIN);
+    expect(onEvent).not.toHaveBeenCalled();
+
+    advance(15 * MIN);
+    expect(onEvent).toHaveBeenCalledTimes(1);
+  });
+
+  // Decision: a session that ran its full time while the page was closed counts.
+  it("completes a session that ended while the page was closed, at its real end time", () => {
+    vi.setSystemTime(T0 + 3 * 60 * MIN); // reopened 3 hours later
+
+    const { result, onEvent } = setup({ initialState: savedRunning });
+
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(firstEvent(onEvent)).toMatchObject({
+      type: "focusCompleted",
+      session: { endedAt: "2026-10-17T09:25:00.000Z", metersGained: 250 },
+    });
+    expect(result.current.state).toMatchObject({ status: "idle", mode: "shortBreak" });
+  });
+
+  it("completes it exactly once under StrictMode", () => {
+    vi.setSystemTime(T0 + 60 * MIN);
+
+    const { onEvent } = setup({ initialState: savedRunning }, StrictMode);
+
+    expect(onEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a paused session paused, however long the page was closed", () => {
+    vi.setSystemTime(T0 + 24 * 60 * MIN);
+    const { endsAt: _endsAt, ...rest } = savedRunning;
+    const savedPaused: TimerState = { ...rest, status: "paused", remainingMs: 7 * MIN };
+
+    const { result, onEvent } = setup({ initialState: savedPaused });
+
+    expect(result.current.state.status).toBe("paused");
+    expect(result.current.remainingMs).toBe(7 * MIN);
+    expect(onEvent).not.toHaveBeenCalled();
   });
 });

@@ -119,7 +119,6 @@ describe("TimerScreen", () => {
     expect(screen.getByRole("heading", { name: "Short break" })).toBeInTheDocument();
     expect(clock()).toHaveTextContent("5:00");
     expect(button("Start break")).toBeInTheDocument();
-    expect(screen.getByText("1 session completed")).toBeInTheDocument();
   });
 
   it("can skip a break back to focus", async () => {
@@ -131,6 +130,12 @@ describe("TimerScreen", () => {
 
     expect(screen.getByRole("heading", { name: "Focus" })).toBeInTheDocument();
     expect(clock()).toHaveTextContent("25:00");
+  });
+
+  it("shows today's completed count it's given", () => {
+    setup({ completedToday: 3 });
+
+    expect(screen.getByText("3 sessions today")).toBeInTheDocument();
   });
 
   it("uses the settings it's given", () => {

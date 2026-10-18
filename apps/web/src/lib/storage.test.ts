@@ -2,7 +2,7 @@
 // data can go wrong.
 import { DEFAULT_TIMER_SETTINGS, TimerSettingsSchema } from "@summit/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadFromStorage, saveToStorage } from "./storage";
+import { loadFromStorage, loadListFromStorage, saveToStorage } from "./storage";
 
 const FALLBACK = DEFAULT_TIMER_SETTINGS;
 const custom = { ...DEFAULT_TIMER_SETTINGS, focusMinutes: 50 };
@@ -52,6 +52,34 @@ describe("loadFromStorage falls back safely when", () => {
     });
 
     expect(loadFromStorage("settings", TimerSettingsSchema, FALLBACK)).toBe(FALLBACK);
+  });
+});
+
+describe("loadListFromStorage", () => {
+  it("returns an empty list when nothing is saved", () => {
+    expect(loadListFromStorage("sessions", TimerSettingsSchema)).toEqual([]);
+  });
+
+  it("returns every item when all are valid", () => {
+    saveToStorage("list", [custom, FALLBACK]);
+
+    expect(loadListFromStorage("list", TimerSettingsSchema)).toEqual([custom, FALLBACK]);
+  });
+
+  // One corrupted entry must not wipe out the rest of the history.
+  it("drops only the invalid items and keeps the rest", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    saveToStorage("list", [custom, { focusMinutes: "oops" }, FALLBACK, null]);
+
+    expect(loadListFromStorage("list", TimerSettingsSchema)).toEqual([custom, FALLBACK]);
+    expect(warn).toHaveBeenCalledWith('Dropped 2 invalid item(s) from "list"');
+  });
+
+  it("returns an empty list when the stored value isn't a list", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    saveToStorage("list", { not: "a list" });
+
+    expect(loadListFromStorage("list", TimerSettingsSchema)).toEqual([]);
   });
 });
 

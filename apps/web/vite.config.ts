@@ -17,5 +17,7 @@ export default defineConfig({
     environment: "jsdom",
     // Runs before every test file: adds DOM matchers and cleans up between tests.
     setupFiles: ["./src/test/setup.ts"],
+    // Pin the time zone so date tests behave the same on every machine and in CI.
+    env: { TZ: "UTC" },
   },
 });
