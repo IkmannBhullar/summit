@@ -1,6 +1,9 @@
 import { progressFromSessions } from "@summit/shared";
+import { MotionConfig } from "motion/react";
 import { useCallback, useMemo, useState } from "react";
-import { ClimbSummary } from "./features/climb/ClimbSummary";
+import { MountainView } from "./features/climb/MountainView";
+import { SummitCelebration } from "./features/climb/SummitCelebration";
+import { useSummitCelebration } from "./features/climb/useSummitCelebration";
 import { HistoryList } from "./features/history/HistoryList";
 import { useSessionHistory } from "./features/history/useSessionHistory";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
@@ -23,6 +26,7 @@ export default function App() {
   // Climb progress is derived from history, never stored separately
   // (decision 011). useMemo re-computes it only when sessions change.
   const progress = useMemo(() => progressFromSessions(sessions), [sessions]);
+  const celebration = useSummitCelebration(progress);
 
   const todayKey = localDateKey(now);
   const completedToday = sessions.filter(
@@ -43,42 +47,52 @@ export default function App() {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="flex items-center justify-between px-6 py-4">
-        <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
-          Summit
-        </h1>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          // Icon-only button: the label is what screen readers announce.
-          aria-label="Timer settings"
-          className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <SlidersIcon />
-        </button>
-      </header>
+    // reducedMotion="user": Motion skips movement animations for people whose
+    // operating system is set to "reduce motion".
+    <MotionConfig reducedMotion="user">
+      <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <header className="flex items-center justify-between px-6 py-4">
+          <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
+            Summit
+          </h1>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            // Icon-only button: the label is what screen readers announce.
+            aria-label="Timer settings"
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <SlidersIcon />
+          </button>
+        </header>
 
-      <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
-        <ClimbSummary progress={progress} />
-        <TimerScreen
+        <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
+          <MountainView progress={progress} />
+          <TimerScreen
+            settings={settings}
+            onEvent={handleTimerEvent}
+            completedToday={completedToday}
+          />
+          <HistoryList sessions={sessions} now={now} />
+        </main>
+
+        <SettingsDialog
+          open={settingsOpen}
           settings={settings}
-          onEvent={handleTimerEvent}
-          completedToday={completedToday}
+          onSave={(next) => {
+            saveSettings(next);
+            setSettingsOpen(false);
+          }}
+          onClose={() => setSettingsOpen(false)}
         />
-        <HistoryList sessions={sessions} now={now} />
-      </main>
 
-      <SettingsDialog
-        open={settingsOpen}
-        settings={settings}
-        onSave={(next) => {
-          saveSettings(next);
-          setSettingsOpen(false);
-        }}
-        onClose={() => setSettingsOpen(false)}
-      />
-    </div>
+        <SummitCelebration
+          peak={celebration.summitedPeak}
+          nextPeak={celebration.nextPeak}
+          onClose={celebration.dismiss}
+        />
+      </div>
+    </MotionConfig>
   );
 }
 
