@@ -28,3 +28,6 @@ export {
   TimerSettingsSchema,
   type TimerSettings,
 } from "./settings";
+
+// The API contract (request/response schemas for /api/...).
+export * from "./api";

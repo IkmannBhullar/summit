@@ -315,3 +315,33 @@ precaches everything.
 **Still large:** React itself and Zod make up much of the remaining bundle.
 Zod has a smaller `zod/mini` API, but switching shared schemas is a bigger
 refactor; worth measuring before Phase 4's deploy.
+
+---
+
+## 015 — The API contract lives in `packages/shared`
+
+_2026-10-18 · Phase 2_
+
+**Decision:** Every API request and response has a Zod schema in
+`packages/shared/src/api/`, plus one standard error shape
+(`{ error: { code, message, fields? } }`). The server validates incoming
+requests with them; the web app uses the same schemas for its forms and can
+validate responses.
+
+**Why:**
+
+- One definition, two uses: a field renamed on the server becomes a type error
+  in the web app immediately, and both sides apply the same validation rules
+  (e.g. the 72-byte bcrypt password limit).
+- Requests contain only what the client is allowed to decide. There's no
+  `metersGained` or `startedAt` in a start-session request, so the
+  server-authoritative rules can't be bypassed by sending extra fields: Zod
+  drops unknown keys.
+- A stable error `code` lets the UI branch reliably (`EMAIL_TAKEN` → "log in
+  instead?") without parsing human-readable messages.
+
+**Alternatives considered:** _OpenAPI spec plus generated clients:_ great for
+public APIs with many consumers, but it's a second source of truth and a
+build step for a project with one client. _tRPC:_ end-to-end types with less
+boilerplate, but it hides the HTTP API, and a plain REST design is more
+useful to learn and demonstrate here.
