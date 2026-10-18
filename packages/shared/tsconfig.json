@@ -1,0 +1,7 @@
+// TypeScript config for packages/shared.
+// Inherits all the strict rules from the repo-wide base config.
+{
+  "extends": "../../tsconfig.base.json",
+  // Only type-check our source (and tests, which live next to the code).
+  "include": ["src"]
+}
