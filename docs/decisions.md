@@ -167,3 +167,22 @@ builds, and CI on a clean clone. Both packages already ship prebuilt binaries.
 
 **Revisit if:** a tool fails with a missing-binary error. Then run
 `npm install-scripts approve <pkg>` for that package only.
+
+---
+
+## 009 — Extra meters past a summit carry over to the next peak
+
+_2026-10-17 · Phase 1_
+
+**Decision:** When a completed session takes a user past a peak's height, the
+peak is marked summited, the next peak unlocks, and the leftover meters are
+added to the new peak. Once the final peak is summited, further meters are
+reported as `unusedMeters`. All of this lives in the pure `applyMeters()`
+function in `packages/shared`, which the server will reuse in Phase 2.
+
+**Why:** Every completed focus minute should count. Throwing away real effort
+because it happened to cross a summit line would feel unfair.
+
+**Alternatives considered:** _Discard the overflow:_ slightly simpler, but
+some focus time would earn nothing. _Stop the session at the summit:_ would
+cut sessions short, and the timer length would depend on game state.

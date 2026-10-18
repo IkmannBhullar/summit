@@ -28,6 +28,20 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // Still flag unused variables, but allow two deliberate patterns:
+      // - names starting with "_" mean "intentionally unused" (e.g. `_req`)
+      // - `const { removed, ...rest } = obj` is the idiom for dropping a field
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
   },
 
   // Plain .js config files (like this one) aren't part of any tsconfig, so
