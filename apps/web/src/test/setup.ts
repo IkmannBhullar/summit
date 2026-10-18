@@ -10,6 +10,8 @@ import "@testing-library/jest-dom/vitest";
 // empty page. (RTL only does this automatically when test globals are on.)
 afterEach(() => {
   cleanup();
+  // Start every test with empty storage so saved data can't leak between tests.
+  localStorage.clear();
 });
 
 // jsdom (our fake browser) doesn't implement <dialog>'s showModal() and

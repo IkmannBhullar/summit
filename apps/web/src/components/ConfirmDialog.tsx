@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { Modal } from "./Modal";
 
 export interface ConfirmDialogProps {
   /** Whether the dialog is showing. The parent owns this state. */
@@ -15,12 +16,7 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * A modal "are you sure?" dialog built on the browser's native <dialog>.
- *
- * Calling showModal() gives us, for free: a backdrop, focus moved into the
- * dialog and kept there, the rest of the page made inert (not clickable or
- * reachable with Tab), and Esc to close. A hand-made <div> modal would need
- * a library or a lot of careful code for all of that.
+ * An "are you sure?" dialog for destructive actions.
  *
  * The Cancel button comes first in the markup, so it gets focus when the
  * dialog opens: pressing Enter by reflex picks the *safe* option.
@@ -34,33 +30,12 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   // Unique ids link the dialog to its title and text for screen readers.
   const titleId = useId();
   const descriptionId = useId();
 
-  // Sync the `open` prop to the real dialog. showModal() must be called as a
-  // method (setting the `open` attribute alone wouldn't make it modal).
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      // The browser closed it (e.g. Esc) while we still think it's open:
-      // report that as a cancel so the parent's state stays in sync.
-      onClose={() => {
-        if (open) onCancel();
-      }}
-      // Tailwind's reset removes the browser's default centering margin, so add it back.
-      className="m-auto w-[min(26rem,calc(100%-2rem))] rounded-2xl bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-950/60 dark:bg-slate-900 dark:text-slate-100"
-    >
+    <Modal open={open} onDismiss={onCancel} labelledBy={titleId} describedBy={descriptionId}>
       <h2 id={titleId} className="text-lg font-semibold">
         {title}
       </h2>
@@ -85,6 +60,6 @@ export function ConfirmDialog({
           {confirmLabel}
         </button>
       </div>
-    </dialog>
+    </Modal>
   );
 }
