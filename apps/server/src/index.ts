@@ -1,17 +1,25 @@
-// Server entry point: builds the app and starts listening for requests.
-// This is the only file that touches the network; tests import createApp instead.
+// Server entry point: validates configuration, builds the app, and starts
+// listening. This is the only file that touches the network; tests import
+// createApp instead.
 import { METERS_PER_FOCUS_MINUTE } from "@summit/shared";
 import { createApp } from "./app";
+import { loadConfig } from "./config/env";
 
-// Hosting platforms tell us which port to use through the PORT env variable.
-// Fall back to 4000 for local development.
-const port = Number(process.env.PORT ?? 4000);
+// Fail fast: exit with a clear message if the environment is incomplete.
+let config;
+try {
+  config = loadConfig();
+} catch (error) {
+  console.error((error as Error).message);
+  console.error("\nCopy apps/server/.env.example to apps/server/.env and fill it in.");
+  process.exit(1);
+}
 
-const app = createApp();
+const app = createApp({ config });
 
-app.listen(port, () => {
+app.listen(config.port, () => {
   // Using a value from @summit/shared here proves the workspace wiring works.
   console.log(
-    `Summit server listening on http://localhost:${port} (${METERS_PER_FOCUS_MINUTE} m per focus minute)`,
+    `Summit server listening on http://localhost:${config.port} (${METERS_PER_FOCUS_MINUTE} m per focus minute)`,
   );
 });

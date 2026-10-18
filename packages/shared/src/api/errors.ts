@@ -28,6 +28,8 @@ export const API_ERROR_CODES = [
   "RATE_LIMITED",
   /** The request must be sent as JSON (415). */
   "UNSUPPORTED_MEDIA_TYPE",
+  /** The request body is bigger than the server accepts (413). */
+  "PAYLOAD_TOO_LARGE",
   /** Something went wrong on the server (500). */
   "INTERNAL_ERROR",
 ] as const;

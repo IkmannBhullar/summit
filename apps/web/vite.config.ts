@@ -9,7 +9,20 @@ import { defineConfig } from "vitest/config";
 /** Summit teal (Tailwind teal-700): the browser/OS chrome color for the installed app. */
 const THEME_COLOR = "#0f766e";
 
+/**
+ * In development, requests to /api/... are forwarded to the Express server.
+ * The browser then only ever talks to one origin (localhost:5173), so there
+ * are no CORS rules to configure and cookies behave like in production with
+ * same-site hosting. Override with API_PROXY_TARGET if the server runs elsewhere.
+ */
+const apiProxy = {
+  "/api": { target: process.env.API_PROXY_TARGET ?? "http://localhost:4000", changeOrigin: true },
+};
+
 export default defineConfig({
+  // The dev server and `vite preview` both forward /api to the backend.
+  server: { proxy: apiProxy },
+  preview: { proxy: apiProxy },
   plugins: [
     // Compiles JSX and enables Fast Refresh (edits appear without losing state).
     react(),
