@@ -1,0 +1,46 @@
+// Shared TypeScript settings for every package in the monorepo.
+// Each package's own tsconfig.json "extends" this file and adds only what is
+// specific to it (e.g. DOM types for the web app, Node types for the server).
+{
+  "compilerOptions": {
+    // --- Output target ---
+    // Modern JavaScript: Node 20+ and current browsers support ES2023 natively.
+    "target": "ES2023",
+    "lib": ["ES2023"],
+
+    // --- Modules ---
+    // We write ES modules (import/export) everywhere.
+    "module": "ESNext",
+    // "Bundler" resolution matches how our tools find files: Vite (web),
+    // tsx (server dev) and Vitest (tests) all resolve imports like a bundler.
+    // It also lets apps import packages/shared straight from its .ts source.
+    "moduleResolution": "Bundler",
+    // Allow `import data from "./file.json"`.
+    "resolveJsonModule": true,
+    // Every file must be compilable on its own; required by fast per-file
+    // transpilers like esbuild (used by Vite, tsx and Vitest).
+    "isolatedModules": true,
+    // Forces `import type { X }` for type-only imports so they are erased
+    // cleanly and never cause a runtime import.
+    "verbatimModuleSyntax": true,
+    // Smooths over importing older CommonJS packages (like Express) from ESM.
+    "esModuleInterop": true,
+
+    // --- Type safety ---
+    // Turns on all strict checks (null checks, no implicit any, etc.).
+    "strict": true,
+    // Indexing an array/record gives `T | undefined`, catching "item might
+    // not exist" bugs at compile time.
+    "noUncheckedIndexedAccess": true,
+    // Error when a switch case falls through to the next without `break`.
+    "noFallthroughCasesInSwitch": true,
+    // Error on file-name casing mismatches (macOS ignores case; Linux CI doesn't).
+    "forceConsistentCasingInFileNames": true,
+
+    // --- Speed / output ---
+    // Don't type-check library .d.ts files in node_modules; much faster.
+    "skipLibCheck": true,
+    // tsc is only our type checker; Vite/tsx/Vitest do the actual compiling.
+    "noEmit": true
+  }
+}

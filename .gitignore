@@ -1,0 +1,33 @@
+# --- Dependencies ---
+# Installed by `npm install`; never commit them.
+node_modules/
+
+# --- Build output ---
+dist/
+build/
+# PWA service worker output during dev (vite-plugin-pwa, Phase 1)
+dev-dist/
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# --- Test output ---
+coverage/
+
+# --- Secrets ---
+# Real environment files hold passwords and keys: never commit them.
+.env
+.env.*
+# ...but DO commit the example files that list which variables are needed.
+!.env.example
+
+# --- Logs ---
+*.log
+npm-debug.log*
+
+# --- OS / editor clutter ---
+.DS_Store
+.idea/
+.vscode/*
+# Allow sharing recommended VS Code extensions/settings later if we want to.
+!.vscode/extensions.json
+!.vscode/settings.json
