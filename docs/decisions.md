@@ -186,3 +186,39 @@ because it happened to cross a summit line would feel unfair.
 **Alternatives considered:** _Discard the overflow:_ slightly simpler, but
 some focus time would earn nothing. _Stop the session at the summit:_ would
 cut sessions short, and the timer length would depend on game state.
+
+---
+
+## 010 — Timer as a pure state machine; side effects as events outside React
+
+_2026-10-17 · Phase 1_
+
+**Decision:** The timer's rules live in a pure `transition(state, action,
+settings)` function that returns the next state **and a list of events**
+(`focusCompleted`, `focusAbandoned`, `breakCompleted`). The `useFocusTimer`
+hook feeds it actions (clicks, interval ticks, `visibilitychange`) with the
+current time. It then fires the events exactly once per dispatch, outside
+React's rendering. Time is tracked only through `endsAt`.
+
+**Why:**
+
+- Every rule (pause math, the long-break rhythm, "time already up counts as
+  completed") is tested with plain function calls and no fake timers.
+- Events have side effects (saving sessions, sounds, notifications). A
+  `useReducer` reducer must be pure, and React deliberately runs it twice in
+  StrictMode, so side effects inside it would fire twice. Dispatching outside
+  React keeps "exactly once" guaranteed; a StrictMode test checks it.
+- A completed session's `endedAt` is its scheduled `endsAt`, not when the
+  (possibly throttled) tab noticed, so history stays accurate.
+
+**Alternatives considered:**
+
+- _`useReducer` + effects that compare old and new state to detect events:_
+  harder to reason about and easy to double-fire.
+- _XState:_ a full state-machine library with visualization tools. It's more
+  than this six-action machine needs.
+
+**Known limitation:** browsers may delay timers in hidden tabs, so the
+end-of-session sound or notification can arrive late in a long-hidden tab.
+Recorded times are always exact. Fully on-time background alerts would need
+server push.
