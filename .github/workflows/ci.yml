@@ -1,0 +1,66 @@
+# Continuous Integration: on every push to main and every pull request,
+# GitHub spins up a fresh Linux machine, installs the repo from scratch, and
+# runs the same checks you run locally. A red ❌ means "don't merge this yet".
+name: CI
+
+on:
+  # Run on pushes to main...
+  push:
+    branches: [main]
+  # ...and on every pull request (whatever branch it comes from). Together
+  # these avoid running twice for the same commit on a PR branch.
+  pull_request:
+
+# If you push again while CI is still running for the same branch/PR, cancel
+# the old run. It's outdated anyway, and this saves CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this workflow only needs to read the code.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    # Fail fast instead of hanging for GitHub's 6-hour default if something gets stuck.
+    timeout-minutes: 10
+
+    steps:
+      # Download the repo's code onto the CI machine.
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      # Install the Node version from .nvmrc (same as local), and cache npm's
+      # download cache between runs (keyed on package-lock.json) for speed.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `npm ci` (clean install) installs exactly what package-lock.json says
+      # and fails if package.json and the lockfile disagree. Use it in CI,
+      # never `npm install`, which may quietly change the lockfile.
+      - name: Install dependencies
+        run: npm ci
+
+      # Ordered from fastest to slowest, so cheap mistakes fail first.
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # Make sure the production web bundle still builds (it can fail even
+      # when typecheck and tests pass, e.g. a broken import of a CSS file).
+      - name: Build web app
+        run: npm run build -w apps/web
