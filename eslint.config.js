@@ -45,16 +45,17 @@ export default defineConfig(
     },
   },
 
-  // Plain .js config files (like this one) aren't part of any tsconfig, so
-  // switch off the rules that need type information for them.
+  // Plain JavaScript files (config files like this one, and scripts) aren't
+  // part of any tsconfig, so switch off the rules that need type information.
   {
-    files: ["**/*.js"],
+    files: ["**/*.{js,mjs}"],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
-  // Node globals (process, console...) for the server and root config files.
+  // Node globals (process, console...) for the server, root config files,
+  // and Node scripts.
   {
-    files: ["apps/server/**/*.ts", "*.js"],
+    files: ["apps/server/**/*.ts", "*.js", "apps/*/scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },
 

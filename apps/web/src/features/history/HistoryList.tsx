@@ -56,7 +56,8 @@ export function HistoryList({ sessions, now, locale }: HistoryListProps) {
             <button
               type="button"
               onClick={() => setVisibleCount((count) => count + HISTORY_PAGE_SIZE)}
-              className="self-start text-sm font-medium text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+              // min-h-11 (44px): a comfortable tap target, even though it looks like a link.
+              className="inline-flex min-h-11 items-center self-start text-sm font-medium text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
             >
               Show more ({hiddenCount} older)
             </button>

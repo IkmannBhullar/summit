@@ -90,7 +90,10 @@ export default function App() {
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
         <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-          <header className="flex items-center justify-between px-6 py-4">
+          {/* Safe-area padding: when installed on a phone with a notch or
+              home bar, keep content out from under them (needs
+              viewport-fit=cover in index.html). */}
+          <header className="flex items-center justify-between px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
             <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
               Summit
             </h1>
@@ -104,27 +107,33 @@ export default function App() {
                 onClick={() => setSettingsOpen(true)}
                 // Icon-only button: the label is what screen readers announce.
                 aria-label="Timer settings"
-                className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+                // p-2.5 around a 24px icon = a 44px tap target, the minimum
+                // comfortable size for a fingertip.
+                className="rounded-lg p-2.5 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <SlidersIcon />
               </button>
             </div>
           </header>
 
-          <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
+          {/* Phones: one column (mountain, timer, history). Wide screens
+              (lg, 1024px+): mountain and timer side by side, history below. */}
+          <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 justify-items-center gap-6 px-6 pt-2 pb-[max(4rem,env(safe-area-inset-bottom))] sm:gap-10 lg:grid-cols-2 lg:items-center lg:gap-x-16 lg:pt-8">
             <MountainView progress={progress} />
             <TimerScreen
               settings={settings}
               onEvent={handleTimerEvent}
               completedToday={completedToday}
             />
-            {showNotificationPrompt && (
-              <NotificationPrompt
-                onEnable={() => void enableNotifications()}
-                onDismiss={() => updatePreferences({ notificationPromptDismissed: true })}
-              />
-            )}
-            <HistoryList sessions={sessions} now={now} />
+            <div className="flex w-full flex-col items-center gap-8 lg:col-span-2">
+              {showNotificationPrompt && (
+                <NotificationPrompt
+                  onEnable={() => void enableNotifications()}
+                  onDismiss={() => updatePreferences({ notificationPromptDismissed: true })}
+                />
+              )}
+              <HistoryList sessions={sessions} now={now} />
+            </div>
           </main>
 
           <SettingsDialog

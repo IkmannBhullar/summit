@@ -22,7 +22,7 @@ export function UpdateBanner({ needRefresh, offlineReady, onReload, onClose }: U
     // role="status": screen readers announce it politely, without interrupting.
     <div
       role="status"
-      className="fixed inset-x-4 bottom-4 mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-2xl bg-slate-900 p-4 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
+      className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] mx-auto flex max-w-md flex-wrap items-center gap-3 rounded-2xl bg-slate-900 p-4 text-sm text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
     >
       <p className="flex-1">
         {needRefresh

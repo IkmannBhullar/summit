@@ -25,14 +25,16 @@ describe("MountainView", () => {
 
     expect(screen.getByRole("heading", { name: "Mt. Fuji" })).toBeInTheDocument();
     expect(screen.getByText("Peak 1 of 8 · Honshu, Japan")).toBeInTheDocument();
-    expect(screen.getByText("250 m of 3,776 m · 3,526 m to summit")).toBeInTheDocument();
+    // The caption is split into spans (so it only wraps between phrases), so
+    // check the figure's combined text rather than one element's.
+    expect(screen.getByRole("figure")).toHaveTextContent("250 m of 3,776 m · 3,526 m to summit");
   });
 
   it("moves on to the next peak after a summit, carrying extra meters", () => {
     render(<MountainView progress={progressAt(4000)} />);
 
     expect(screen.getByRole("heading", { name: "Mt. Rainier" })).toBeInTheDocument();
-    expect(screen.getByText("224 m of 4,392 m · 4,168 m to summit")).toBeInTheDocument();
+    expect(screen.getByRole("figure")).toHaveTextContent("224 m of 4,392 m · 4,168 m to summit");
   });
 
   it("celebrates the end when every peak is summited", () => {

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p .",
     "test": "vitest run",
-    "generate-icons": "pwa-assets-generator"
+    "generate-icons": "pwa-assets-generator",
+    "check:offline": "node scripts/check-offline.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

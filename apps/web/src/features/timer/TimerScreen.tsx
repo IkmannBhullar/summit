@@ -87,7 +87,7 @@ export function TimerScreen({
   return (
     <section
       aria-labelledby="timer-mode"
-      className="flex w-full max-w-sm flex-col items-center gap-6"
+      className="flex w-full max-w-sm flex-col items-center gap-4 sm:gap-6"
     >
       <h2
         id="timer-mode"
@@ -105,7 +105,7 @@ export function TimerScreen({
       <p
         role="timer"
         aria-label={`${clock} remaining`}
-        className="text-7xl font-bold tabular-nums sm:text-8xl"
+        className="text-6xl font-bold tabular-nums min-[380px]:text-7xl sm:text-8xl"
       >
         {clock}
       </p>

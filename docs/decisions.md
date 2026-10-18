@@ -291,7 +291,8 @@ clicks **Reload** in a banner. App icons are generated once from
 were cached, Chrome reported no installability errors, and the app (plus
 a deep link) loaded with the server stopped and the network offline. (The
 Claude desktop browser pane can't register service workers, so it can't
-test this.)
+test this.) The check is repeatable: `npm run check:offline -w apps/web`
+runs it against the latest build and exits with an error if anything fails.
 
 **Alternatives considered:** _`autoUpdate`:_ simpler, but it reloads at
 random moments. _Hand-written service worker:_ full control, but caching

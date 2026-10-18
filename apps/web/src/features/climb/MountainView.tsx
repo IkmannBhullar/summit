@@ -32,7 +32,7 @@ export function MountainView({ progress }: { progress: ClimbProgress }) {
   const metersToSummit = current?.metersToSummit ?? 0;
 
   return (
-    <figure className="flex w-full max-w-md flex-col gap-3">
+    <figure className="flex w-full max-w-md flex-col gap-2 sm:gap-3">
       {/* key: a new peak remounts the drawing, so the climber starts at the
           new trailhead instead of animating backwards down the old mountain. */}
       <MountainDrawing
@@ -47,9 +47,17 @@ export function MountainView({ progress }: { progress: ClimbProgress }) {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Peak {peak.order} of {PEAKS.length} · {peak.region}
         </p>
+        {/* Each phrase stays on one line; only the gap between them can wrap. */}
         <p className="mt-1 text-slate-600 dark:text-slate-300">
-          {meters(metersGained)} of {meters(peak.heightMeters)}
-          {current && ` · ${meters(metersToSummit)} to summit`}
+          <span className="whitespace-nowrap">
+            {meters(metersGained)} of {meters(peak.heightMeters)}
+          </span>
+          {current && (
+            <>
+              {" · "}
+              <span className="whitespace-nowrap">{meters(metersToSummit)} to summit</span>
+            </>
+          )}
         </p>
       </figcaption>
     </figure>
@@ -104,8 +112,10 @@ function MountainDrawing({ peakName, fraction, metersGained, heightMeters }: Mou
       role="img"
       aria-labelledby={titleId}
       // Round the corners on the <svg> itself; overflow-hidden clips the
-      // mountain's bottom corners to match.
-      className="w-full overflow-hidden rounded-2xl"
+      // mountain's bottom corners to match. On short phone screens, cap the
+      // height so the timer and Start button still fit without scrolling
+      // (the drawing scales down, keeping its shape).
+      className="max-h-[25dvh] w-full overflow-hidden rounded-2xl sm:max-h-none"
     >
       <title id={titleId}>
         {`Climber at ${meters(metersGained)} of ${meters(heightMeters)} on ${peakName}`}

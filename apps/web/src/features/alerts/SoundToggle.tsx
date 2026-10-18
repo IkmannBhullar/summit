@@ -14,7 +14,8 @@ export function SoundToggle({ enabled, onChange }: SoundToggleProps) {
       aria-pressed={enabled}
       aria-label="Sound"
       onClick={() => onChange(!enabled)}
-      className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+      // p-2.5 around the 24px icon = a 44px tap target.
+      className="rounded-lg p-2.5 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
     >
       <svg
         aria-hidden="true"

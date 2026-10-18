@@ -7,7 +7,9 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Makes the layout scale correctly on phones instead of zooming out. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the installed app use the whole screen on
+         phones with a notch; the CSS adds safe-area padding to compensate. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
       content="Summit: a focus timer where every focus minute climbs a real mountain."
