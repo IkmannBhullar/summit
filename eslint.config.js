@@ -4,6 +4,7 @@
 import js from "@eslint/js";
 import prettierConfig from "eslint-config-prettier";
 import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -57,12 +58,14 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
 
-  // Browser globals (window, document...) plus React hooks rules for the web
-  // app. The hooks rules enforce things like "don't call hooks inside an if"
-  // and "list every dependency your effect uses".
+  // Browser globals (window, document...) plus React rules for the web app:
+  // - react-hooks: "don't call hooks inside an if", "list every dependency
+  //   your effect uses", and similar.
+  // - react-refresh: component files should export only components, or
+  //   Vite's Fast Refresh can't hot-swap them and falls back to a full reload.
   {
     files: ["apps/web/**/*.{ts,tsx}"],
-    extends: [reactHooks.configs.flat.recommended],
+    extends: [reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: { globals: globals.browser },
   },
 

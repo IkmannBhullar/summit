@@ -11,3 +11,18 @@ import "@testing-library/jest-dom/vitest";
 afterEach(() => {
   cleanup();
 });
+
+// jsdom (our fake browser) doesn't implement <dialog>'s showModal() and
+// close(). These stand-ins toggle the `open` attribute and fire the `close`
+// event like a real browser. They can't imitate focus trapping or the Esc
+// key; those are checked in a real browser.
+if (typeof HTMLDialogElement.prototype.showModal !== "function") {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    if (!this.hasAttribute("open")) return;
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  };
+}
