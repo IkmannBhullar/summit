@@ -1,0 +1,37 @@
+# Local development services. Start with `docker compose up -d`.
+# Production uses a managed database (Render, later AWS RDS), not this file.
+#
+# Values like ${POSTGRES_USER:-summit} read from the root .env file and fall
+# back to the default after ":-" when it isn't set. See .env.example.
+
+services:
+  db:
+    # Official Postgres image; the "alpine" variant is a much smaller download.
+    # Pinned to a major version so everyone (and CI) runs the same Postgres.
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      # Local-only credentials. The real production password lives in the
+      # hosting platform's secret settings, never in this repo.
+      POSTGRES_USER: ${POSTGRES_USER:-summit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-summit}
+      POSTGRES_DB: ${POSTGRES_DB:-summit}
+    ports:
+      # "host:container". Inside the container Postgres always listens on 5432.
+      # On your machine we expose it on 5434 so it can't clash with other
+      # Postgres instances already using 5432/5433.
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      # Keep the data in a named Docker volume so it survives restarts and
+      # `docker compose down`. (`docker compose down -v` deletes it.)
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Docker runs this regularly; the container is "healthy" once Postgres
+      # accepts connections. Useful to wait on before running migrations.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
