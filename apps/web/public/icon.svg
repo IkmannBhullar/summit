@@ -1,0 +1,12 @@
+<!-- Summit app icon (source for the generated PNGs; see pwa-assets.config.ts).
+     A white mountain with a red summit flag on Summit teal. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0f766e"/>
+  <!-- Mountain -->
+  <path d="M64 400 L180 244 L226 298 L304 140 L448 400 Z" fill="#f8fafc"/>
+  <!-- Shadow side of the main peak, for depth -->
+  <path d="M304 140 L448 400 L352 400 L322 300 L336 260 Z" fill="#cbd5e1"/>
+  <!-- Flag pole and flag -->
+  <line x1="304" y1="140" x2="304" y2="70" stroke="#f8fafc" stroke-width="10" stroke-linecap="round"/>
+  <path d="M304 72 L360 92 L304 112 Z" fill="#ef4444"/>
+</svg>

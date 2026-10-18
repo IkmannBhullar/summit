@@ -1,5 +1,5 @@
 import type { Peak } from "@summit/shared";
-import { motion } from "motion/react";
+import { m } from "motion/react";
 import { useId } from "react";
 import { Modal } from "../../components/Modal";
 
@@ -27,7 +27,7 @@ export function SummitCelebration({ peak, nextPeak, onClose }: SummitCelebration
         <div className="flex flex-col items-center gap-3 text-center">
           {/* The flag pops in with a little bounce. MotionConfig in App turns
               this off for people who prefer reduced motion. */}
-          <motion.svg
+          <m.svg
             aria-hidden="true"
             viewBox="0 0 48 48"
             className="size-16"
@@ -44,7 +44,7 @@ export function SummitCelebration({ peak, nextPeak, onClose }: SummitCelebration
               className="stroke-slate-700 dark:stroke-slate-200"
             />
             <path d="M14 6 L40 14 L14 22 Z" className="fill-red-500" />
-          </motion.svg>
+          </m.svg>
 
           <h2 id={titleId} className="text-2xl font-bold">
             You summited {peak.name}!

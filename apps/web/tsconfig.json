@@ -7,9 +7,10 @@
     // Use React's automatic JSX runtime: no need to `import React` in every file.
     "jsx": "react-jsx",
     // Vite's types let TypeScript understand `import.meta.env` and
-    // imports of non-code files like .css and .svg.
-    "types": ["vite/client"]
+    // imports of non-code files like .css and .svg. The PWA plugin's types
+    // describe its "virtual:pwa-register/react" module.
+    "types": ["vite/client", "vite-plugin-pwa/react"]
   },
-  // App source, tests, and the Vite config itself.
-  "include": ["src", "vite.config.ts"]
+  // App source, tests, and the config files (so they're type-checked and linted too).
+  "include": ["src", "vite.config.ts", "pwa-assets.config.ts"]
 }

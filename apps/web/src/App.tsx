@@ -1,5 +1,5 @@
 import { progressFromSessions } from "@summit/shared";
-import { MotionConfig } from "motion/react";
+import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import { useCallback, useMemo, useState } from "react";
 import { alertFor } from "./features/alerts/alertFor";
 import { chime } from "./features/alerts/chime";
@@ -17,6 +17,7 @@ import { SummitCelebration } from "./features/climb/SummitCelebration";
 import { useSummitCelebration } from "./features/climb/useSummitCelebration";
 import { HistoryList } from "./features/history/HistoryList";
 import { useSessionHistory } from "./features/history/useSessionHistory";
+import { UpdatePrompt } from "./features/pwa/UpdatePrompt";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
 import { useSettings } from "./features/settings/useSettings";
 import type { TimerEvent } from "./features/timer/timerMachine";
@@ -81,64 +82,71 @@ export default function App() {
   };
 
   return (
+    // LazyMotion + the lightweight `m` components load only the animation
+    // features we use (domAnimation), about 12 kB gzipped less than the full
+    // `motion` components. `strict` throws if a full `motion.*` sneaks back in.
     // reducedMotion="user": Motion skips movement animations for people whose
     // operating system is set to "reduce motion".
-    <MotionConfig reducedMotion="user">
-      <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-        <header className="flex items-center justify-between px-6 py-4">
-          <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
-            Summit
-          </h1>
-          <div className="flex items-center gap-1">
-            <SoundToggle
-              enabled={preferences.soundEnabled}
-              onChange={(soundEnabled) => updatePreferences({ soundEnabled })}
-            />
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              // Icon-only button: the label is what screen readers announce.
-              aria-label="Timer settings"
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <SlidersIcon />
-            </button>
-          </div>
-        </header>
+    <LazyMotion features={domAnimation} strict>
+      <MotionConfig reducedMotion="user">
+        <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+          <header className="flex items-center justify-between px-6 py-4">
+            <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
+              Summit
+            </h1>
+            <div className="flex items-center gap-1">
+              <SoundToggle
+                enabled={preferences.soundEnabled}
+                onChange={(soundEnabled) => updatePreferences({ soundEnabled })}
+              />
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                // Icon-only button: the label is what screen readers announce.
+                aria-label="Timer settings"
+                className="rounded-lg p-2 text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <SlidersIcon />
+              </button>
+            </div>
+          </header>
 
-        <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
-          <MountainView progress={progress} />
-          <TimerScreen
+          <main className="flex flex-1 flex-col items-center gap-12 px-6 pt-6 pb-16">
+            <MountainView progress={progress} />
+            <TimerScreen
+              settings={settings}
+              onEvent={handleTimerEvent}
+              completedToday={completedToday}
+            />
+            {showNotificationPrompt && (
+              <NotificationPrompt
+                onEnable={() => void enableNotifications()}
+                onDismiss={() => updatePreferences({ notificationPromptDismissed: true })}
+              />
+            )}
+            <HistoryList sessions={sessions} now={now} />
+          </main>
+
+          <SettingsDialog
+            open={settingsOpen}
             settings={settings}
-            onEvent={handleTimerEvent}
-            completedToday={completedToday}
+            onSave={(next) => {
+              saveSettings(next);
+              setSettingsOpen(false);
+            }}
+            onClose={() => setSettingsOpen(false)}
           />
-          {showNotificationPrompt && (
-            <NotificationPrompt
-              onEnable={() => void enableNotifications()}
-              onDismiss={() => updatePreferences({ notificationPromptDismissed: true })}
-            />
-          )}
-          <HistoryList sessions={sessions} now={now} />
-        </main>
 
-        <SettingsDialog
-          open={settingsOpen}
-          settings={settings}
-          onSave={(next) => {
-            saveSettings(next);
-            setSettingsOpen(false);
-          }}
-          onClose={() => setSettingsOpen(false)}
-        />
+          <SummitCelebration
+            peak={celebration.summitedPeak}
+            nextPeak={celebration.nextPeak}
+            onClose={celebration.dismiss}
+          />
 
-        <SummitCelebration
-          peak={celebration.summitedPeak}
-          nextPeak={celebration.nextPeak}
-          onClose={celebration.dismiss}
-        />
-      </div>
-    </MotionConfig>
+          <UpdatePrompt />
+        </div>
+      </MotionConfig>
+    </LazyMotion>
   );
 }
 

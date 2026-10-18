@@ -1,5 +1,5 @@
 import { getCurrentClimb, PEAKS, type ClimbProgress, type Peak } from "@summit/shared";
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { animate, m, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { useEffect, useId } from "react";
 import {
   MOUNTAIN_OUTLINE,
@@ -132,7 +132,7 @@ function MountainDrawing({ peakName, fraction, metersGained, heightMeters }: Mou
         className="stroke-slate-100/80 dark:stroke-slate-400/60"
       />
       {/* ...and the part already climbed, solid on top of it. */}
-      <motion.path
+      <m.path
         d={TRAIL_PATH}
         fill="none"
         strokeWidth={3}
@@ -159,7 +159,7 @@ function MountainDrawing({ peakName, fraction, metersGained, heightMeters }: Mou
       />
 
       {/* The climber */}
-      <motion.circle
+      <m.circle
         cx={climberX}
         cy={climberY}
         r={6}

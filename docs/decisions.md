@@ -263,3 +263,54 @@ the server decides in Phase 2.
 
 **Alternatives considered:** _Treat a reload as giving up:_ matches the
 rope-team rule, but it punishes accidental refreshes in solo mode.
+
+---
+
+## 013 — PWA: precache everything, ask before updating
+
+_2026-10-18 · Phase 1_
+
+**Decision:** `vite-plugin-pwa` (Workbox `generateSW`) precaches the whole
+app at install time (HTML, JS, CSS, icons) and serves `index.html` for any
+navigation, so the app, including deep links, works with no network.
+Updates use `registerType: "prompt"`: a new version waits until the user
+clicks **Reload** in a banner. App icons are generated once from
+`public/icon.svg` (`npm run generate-icons -w apps/web`) and committed.
+
+**Why:**
+
+- A focus timer has to work on a train or with flaky Wi-Fi; there's no
+  server dependency in Phase 1.
+- `autoUpdate` would reload the page whenever an update arrived. Thanks to
+  decision 012 a reload can't lose a session, but it would still interrupt
+  the user. Asking keeps the user in control.
+- Committing generated icons keeps builds fast and free of image tooling
+  (the generator uses a native image library).
+
+**Verified:** in headless Chrome, the service worker activated, all files
+were cached, Chrome reported no installability errors, and the app (plus
+a deep link) loaded with the server stopped and the network offline. (The
+Claude desktop browser pane can't register service workers, so it can't
+test this.)
+
+**Alternatives considered:** _`autoUpdate`:_ simpler, but it reloads at
+random moments. _Hand-written service worker:_ full control, but caching
+and versioning are easy to get subtly wrong; Workbox handles both.
+
+---
+
+## 014 — Lazy-load Motion's animation features
+
+_2026-10-18 · Phase 1_
+
+**Decision:** Use `LazyMotion` with `domAnimation` and the lightweight `m`
+components instead of `motion.*`, with `strict` so a full `motion.*`
+component can't sneak back in.
+
+**Why:** It measured about 12.5 kB gzipped smaller (150 → 138 kB) with no
+change in behavior. Bundle size matters more for an installable app that
+precaches everything.
+
+**Still large:** React itself and Zod make up much of the remaining bundle.
+Zod has a smaller `zod/mini` API, but switching shared schemas is a bigger
+refactor; worth measuring before Phase 4's deploy.
