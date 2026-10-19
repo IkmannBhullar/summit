@@ -15,12 +15,17 @@ describe("loadConfig", () => {
       port: 4000,
       databaseUrl: valid.DATABASE_URL,
       jwtSecret: valid.JWT_SECRET,
+      bcryptRounds: 12,
     });
   });
 
   // Env values are always strings; PORT must become a real number.
   it("converts PORT from text to a number", () => {
     expect(loadConfig({ ...valid, PORT: "8080" }).port).toBe(8080);
+  });
+
+  it("refuses a bcrypt cost too low to be safe", () => {
+    expect(() => loadConfig({ ...valid, BCRYPT_ROUNDS: "4" })).toThrow(/BCRYPT_ROUNDS/);
   });
 
   it("knows when it's running in production", () => {

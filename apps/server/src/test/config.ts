@@ -15,4 +15,7 @@ export const testConfig: Config = {
   port: 0,
   databaseUrl: TEST_DATABASE_URL,
   jwtSecret: "test-secret-that-is-at-least-32-characters-long",
+  // The minimum bcrypt allows: hashing takes ~1 ms instead of ~250 ms.
+  // Fine for tests, never for real passwords (the env schema requires 10+).
+  bcryptRounds: 4,
 };

@@ -381,3 +381,55 @@ can't fail on a broken query. _A separate Docker container for tests:_
 cleaner isolation, but heavier; a second database in the same Postgres is
 enough. _Drizzle or Kysely:_ lighter and closer to SQL, but Prisma's
 schema-first migrations and generated types are a good fit for learning.
+
+---
+
+## 017 — Auth: bcrypt hashes, a JWT in an httpOnly cookie, rate-limited
+
+_2026-10-18 · Phase 2_
+
+**Decision:**
+
+- **Passwords** are hashed with bcrypt (`bcryptjs`, pure JavaScript, the
+  same algorithm and hash format as native `bcrypt`), cost 12, configurable
+  as `BCRYPT_ROUNDS` (minimum 10). Passwords over 72 bytes are rejected
+  (bcrypt ignores the rest).
+- **Signing in** sets a 7-day JWT (HS256, `jose`) in the `summit_session`
+  cookie: **httpOnly** (page JavaScript can't read it), **SameSite=Lax**
+  (not sent with cross-site POSTs), **Secure** in production. Tokens are
+  checked for algorithm, issuer, audience, and expiry.
+- **No account enumeration on login:** an unknown email gets the same
+  "Wrong email or password" (401) as a wrong password, _and_ takes the same
+  time, by comparing against a dummy hash made with the same cost.
+  (Registration still says when an email is taken; that's unavoidable for a
+  usable sign-up form, and rate limiting keeps it slow to abuse.)
+- **Rate limiting:** 10 login/register attempts per IP per 15 minutes,
+  answered with 429 `RATE_LIMITED`. In production, `trust proxy` is set to
+  one hop so the limiter sees real client IPs behind the host's proxy.
+- **CSRF:** SameSite=Lax plus "JSON bodies only" (decision 015, step 2).
+  HTML forms can't send JSON, and cross-site JavaScript can't send it
+  without a CORS preflight we don't allow.
+
+**Why cookies instead of a token in localStorage?** Anything in
+localStorage is readable by any script on the page, so one XSS bug leaks
+every user's token. An httpOnly cookie can't be read by scripts at all, and
+the browser attaches it automatically.
+
+**Known trade-offs:**
+
+- Stateless JWTs can't be revoked before they expire. Logout deletes the
+  cookie, but a copied token keeps working for up to 7 days. If needed, add
+  a per-user `tokenVersion` checked on each request ("log out everywhere").
+- The in-memory rate-limit store is per server process. With several
+  instances, each counts separately; a shared store (Redis) would fix that,
+  the same scaling note as Socket.io in Phase 3.
+- Phase 4's cross-site deploy (web on Vercel, API on Render) changes cookie
+  rules (SameSite=None plus extra CSRF protection, or a custom domain so both
+  are same-site). That's revisited then.
+
+**Alternatives considered:** _Server-side sessions in the database:_
+revocable, but a database lookup on every request. _An auth provider
+(Auth0, Clerk, Supabase Auth):_ less code, but the point here is to
+understand and show how auth works. _Argon2:_ a newer password hash and a
+fine choice, but it needs a native build; bcrypt is still widely accepted
+at this cost.

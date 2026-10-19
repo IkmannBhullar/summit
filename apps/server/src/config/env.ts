@@ -20,6 +20,9 @@ const EnvSchema = z.object({
     .refine((url) => /^postgres(ql)?:\/\//.test(url), {
       message: "must be a postgres:// connection string",
     }),
+  // bcrypt "cost": each +1 doubles the time to hash (and to brute-force).
+  // 12 takes roughly a quarter of a second, a good balance for logins.
+  BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
   JWT_SECRET: z.string({ message: "is required" }).min(MIN_JWT_SECRET_LENGTH, {
     message: `must be at least ${MIN_JWT_SECRET_LENGTH} characters (try: openssl rand -base64 48)`,
   }),
@@ -32,6 +35,8 @@ export interface Config {
   port: number;
   databaseUrl: string;
   jwtSecret: string;
+  /** bcrypt cost factor. Tests use a tiny value to stay fast. */
+  bcryptRounds: number;
 }
 
 /**
@@ -56,5 +61,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     port: parsed.PORT,
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret: parsed.JWT_SECRET,
+    bcryptRounds: parsed.BCRYPT_ROUNDS,
   };
 }
