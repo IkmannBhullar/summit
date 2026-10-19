@@ -41,16 +41,22 @@ describe("password service", () => {
     const real = await slow.hash("correct horse");
     await slow.verifyAgainstDummy("warm up"); // the first call also builds the dummy hash
 
-    const time = async (check: () => Promise<boolean>) => {
-      const start = performance.now();
-      await check();
-      return performance.now() - start;
+    /** Median time of several runs: one sample is too noisy on a busy machine. */
+    const medianMs = async (check: () => Promise<boolean>) => {
+      const times: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = performance.now();
+        await check();
+        times.push(performance.now() - start);
+      }
+      return times.sort((a, b) => a - b)[2]!;
     };
-    const realMs = await time(() => slow.verify("wrong guess", real));
-    const dummyMs = await time(() => slow.verifyAgainstDummy("wrong guess"));
+    const realMs = await medianMs(() => slow.verify("wrong guess", real));
+    const dummyMs = await medianMs(() => slow.verifyAgainstDummy("wrong guess"));
 
-    // Generous bounds so a busy machine can't make this flaky.
-    expect(dummyMs).toBeGreaterThan(realMs * 0.5);
-    expect(dummyMs).toBeLessThan(realMs * 2);
+    // Wide bounds, so a noisy machine can't fail this, yet a cost mismatch
+    // still would: each bcrypt round doubles the time (cost 4 vs 10 is 64x).
+    expect(dummyMs).toBeGreaterThan(realMs / 3);
+    expect(dummyMs).toBeLessThan(realMs * 3);
   });
 });

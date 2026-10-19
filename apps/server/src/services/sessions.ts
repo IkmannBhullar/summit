@@ -17,6 +17,7 @@ import {
   progressFromSessions,
   type ClimbProgress,
   type FocusSession,
+  type ImportResult,
   type ListSessionsQuery,
   type SessionPage,
   type StartSessionInput,
@@ -25,6 +26,7 @@ import { z } from "zod";
 import type { PrismaClient } from "../db/client";
 import { Prisma, type FocusSession as SessionRow } from "../generated/prisma/client";
 import { HttpError } from "../lib/httpError";
+import { selectImportable } from "./importRules";
 
 /**
  * How much earlier than its planned length a completion may arrive.
@@ -89,6 +91,8 @@ export interface SessionService {
   history: (userId: string, query: ListSessionsQuery) => Promise<SessionPage>;
   /** Climb progress, replayed from the user's completed sessions. */
   climb: (userId: string) => Promise<ClimbProgress>;
+  /** Copies a guest's browser history into their account (see importRules.ts). */
+  importGuestHistory: (userId: string, sessions: readonly FocusSession[]) => Promise<ImportResult>;
 }
 
 const notFound = () => new HttpError(404, "NOT_FOUND", "Session not found.");
@@ -244,6 +248,58 @@ export function createSessionService(
       });
       // The same shared, already-tested function the browser uses.
       return progressFromSessions(rows.map(toSessionDto));
+    },
+
+    async importGuestHistory(userId, sessions) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { createdAt: true },
+      });
+      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Please sign in to continue.");
+
+      // Ids already in the database (imported before, or anyone else's) are
+      // skipped without saying whose they are.
+      const taken = await prisma.focusSession.findMany({
+        where: { id: { in: sessions.map((session) => session.id) } },
+        select: { id: true },
+      });
+      const takenIds = new Set(taken.map((row) => row.id));
+      const fresh = sessions.filter((session) => !takenIds.has(session.id));
+
+      // The account's existing sessions, so imports can't overlap them.
+      const currentTime = now();
+      const existing = await prisma.focusSession.findMany({
+        where: { userId },
+        select: { startedAt: true, endedAt: true },
+      });
+      const { accepted } = selectImportable(fresh, {
+        accountCreatedAt: user.createdAt,
+        now: currentTime,
+        existing: existing.map((row) => ({
+          start: row.startedAt.getTime(),
+          // A running session occupies time up to now.
+          end: (row.endedAt ?? currentTime).getTime(),
+        })),
+      });
+
+      // One INSERT for the whole batch. skipDuplicates covers the rare race
+      // where the same import is sent twice at the same moment.
+      const { count } = await prisma.focusSession.createMany({
+        data: accepted.map((session) => ({
+          id: session.id,
+          userId,
+          plannedMinutes: session.plannedMinutes,
+          startedAt: new Date(session.startedAt),
+          endedAt: session.endedAt === null ? null : new Date(session.endedAt),
+          status: session.status,
+          tag: session.tag,
+          metersGained: session.metersGained, // already recalculated by selectImportable
+          imported: true,
+        })),
+        skipDuplicates: true,
+      });
+
+      return { imported: count, skipped: sessions.length - count };
     },
   };
 }

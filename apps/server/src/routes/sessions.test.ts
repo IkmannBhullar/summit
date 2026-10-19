@@ -3,6 +3,9 @@
 import {
   ClimbResponseSchema,
   getCurrentClimb,
+  ImportResultSchema,
+  MAX_IMPORT_SESSIONS,
+  type FocusSession,
   SessionPageSchema,
   SessionResponseSchema,
 } from "@summit/shared";
@@ -395,6 +398,7 @@ describe("authentication", () => {
     ["POST", `/api/sessions/${randomUUID()}/abandon`],
     ["GET", "/api/sessions"],
     ["GET", "/api/climb"],
+    ["POST", "/api/sessions/import"],
   ])("%s %s requires sign-in (401)", async (method, path) => {
     const req = method === "GET" ? request(app).get(path) : request(app).post(path);
 
@@ -402,5 +406,126 @@ describe("authentication", () => {
 
     expect(res.status).toBe(401);
     expect(apiError(res).code).toBe("UNAUTHENTICATED");
+  });
+});
+
+describe("POST /api/sessions/import (guest history)", () => {
+  /** A finished guest session from the day before the test, as Phase 1 stored them. */
+  function guestSession(start: string, overrides: Partial<FocusSession> = {}): FocusSession {
+    const status = overrides.status ?? "COMPLETED";
+    const plannedMinutes = overrides.plannedMinutes ?? 25;
+    return {
+      id: randomUUID(),
+      plannedMinutes,
+      startedAt: start,
+      endedAt: new Date(Date.parse(start) + plannedMinutes * MIN).toISOString(),
+      status,
+      tag: null,
+      metersGained: status === "COMPLETED" ? plannedMinutes * 10 : 0,
+      roomId: null,
+      ...overrides,
+    };
+  }
+
+  const importResult = (res: Response) => ImportResultSchema.parse(res.body);
+
+  it("imports guest sessions, flags them, and counts them toward the climb", async () => {
+    const agent = await signIn();
+    const sessions = [
+      guestSession("2026-10-17T09:00:00.000Z"),
+      guestSession("2026-10-17T10:00:00.000Z"),
+      guestSession("2026-10-17T11:00:00.000Z", {
+        status: "ABANDONED",
+        endedAt: "2026-10-17T11:07:00.000Z",
+      }),
+    ];
+
+    const res = await agent.post("/api/sessions/import").send({ sessions });
+
+    expect(res.status).toBe(200);
+    expect(importResult(res)).toEqual({ imported: 3, skipped: 0 });
+    await expect(prisma.focusSession.count({ where: { imported: true } })).resolves.toBe(3);
+    expect(getCurrentClimb(await climb(agent))?.climb.metersGained).toBe(500);
+    const page = SessionPageSchema.parse((await agent.get("/api/sessions")).body);
+    expect(page.sessions).toHaveLength(3);
+  });
+
+  // The device may retry, or the user may click "Import" twice.
+  it("is safe to repeat: already-imported sessions are skipped", async () => {
+    const agent = await signIn();
+    const sessions = [guestSession("2026-10-17T09:00:00.000Z")];
+    await agent.post("/api/sessions/import").send({ sessions });
+
+    const again = await agent.post("/api/sessions/import").send({ sessions });
+
+    expect(importResult(again)).toEqual({ imported: 0, skipped: 1 });
+    expect(getCurrentClimb(await climb(agent))?.climb.metersGained).toBe(250);
+  });
+
+  it("can't claim ids that belong to another user's sessions", async () => {
+    const ana = await signIn("ana@example.com");
+    const ben = await signIn("ben@example.com");
+    const anasSession = guestSession("2026-10-17T09:00:00.000Z");
+    await ana.post("/api/sessions/import").send({ sessions: [anasSession] });
+
+    const res = await ben.post("/api/sessions/import").send({ sessions: [anasSession] });
+
+    expect(importResult(res)).toEqual({ imported: 0, skipped: 1 });
+    const row = await prisma.focusSession.findUniqueOrThrow({ where: { id: anasSession.id } });
+    expect(row.metersGained).toBe(250); // Ana's session is untouched
+  });
+
+  it("skips guest sessions that overlap sessions the account already has", async () => {
+    const agent = await signIn();
+    await focus(agent); // a live session from 09:00 to 09:25 on the test day
+    clock = T0 + 2 * 60 * MIN;
+
+    const res = await agent
+      .post("/api/sessions/import")
+      .send({ sessions: [guestSession("2026-10-18T09:10:00.000Z")] });
+
+    expect(importResult(res)).toEqual({ imported: 0, skipped: 1 });
+  });
+
+  it("imports a full batch of 1,000 sessions in one request", async () => {
+    const agent = await signIn();
+    const sessions = Array.from({ length: MAX_IMPORT_SESSIONS }, (_, i) =>
+      guestSession(new Date(Date.parse("2026-09-01T00:00:00.000Z") + i * 2 * MIN).toISOString(), {
+        plannedMinutes: 1,
+      }),
+    );
+
+    const res = await agent.post("/api/sessions/import").send({ sessions });
+
+    expect(importResult(res)).toEqual({ imported: 1000, skipped: 0 });
+    // 10,000 m summits Fuji and Rainier, so check the total across all peaks.
+    const progress = await climb(agent);
+    const totalMeters = progress.climbs.reduce((sum, c) => sum + c.metersGained, 0);
+    expect(totalMeters).toBe(1000 * 10);
+  });
+
+  it.each([
+    ["an empty list", { sessions: [] }],
+    [
+      "more than the maximum",
+      { sessions: Array.from({ length: MAX_IMPORT_SESSIONS + 1 }, () => ({})) },
+    ],
+  ])("rejects %s (400)", async (_label, body) => {
+    const agent = await signIn();
+
+    const res = await agent.post("/api/sessions/import").send(body);
+
+    expect(res.status).toBe(400);
+  });
+
+  // The shared schema refuses inconsistent data before any rule runs.
+  it("rejects a session claiming meters it didn't earn (400)", async () => {
+    const agent = await signIn();
+    const tampered = { ...guestSession("2026-10-17T09:00:00.000Z"), metersGained: 99_999 };
+
+    const res = await agent.post("/api/sessions/import").send({ sessions: [tampered] });
+
+    expect(res.status).toBe(400);
+    await expect(prisma.focusSession.count()).resolves.toBe(0);
   });
 });

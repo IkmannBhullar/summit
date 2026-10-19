@@ -485,3 +485,39 @@ guest history (step 6) can't be verified this way, so it's marked `imported`.
 _The server runs the timer and pushes the end:_ stronger, but it needs a
 persistent connection (that's Phase 3's rope-team model) and breaks when the
 connection drops.
+
+---
+
+## 019 — Importing guest history: trusted once, made plausible, and flagged
+
+_2026-10-18 · Phase 2_
+
+**Decision:** `POST /api/sessions/import` copies up to 1,000 sessions from a
+guest's browser into their new account. The server can't verify history it
+never saw live (decision 018), so a pure rule function (`importRules.ts`)
+only accepts sessions that are at least physically plausible:
+
+- finished (COMPLETED or ABANDONED), solo (no `roomId`)
+- **started before the account was created** (later sessions should have used
+  the live, server-checked API)
+- not in the future (with 5 minutes of allowance for device clock drift)
+- a "completed" session lasted at least its planned length
+- **no overlaps** with each other or with the account's existing sessions
+  (nobody focuses twice at once, which also caps any day at 24 hours)
+- ids not already in the database (re-importing is a harmless no-op, and
+  another user's ids are skipped without revealing anything)
+
+Meters are **recalculated** on the server, every accepted row is marked
+`imported = true`, and the response says how many were imported and skipped.
+
+**Why:** Phase 1 users shouldn't lose their climbs when they sign up, but
+import is the one place a cheater could invent history. The rules can't stop
+someone fabricating _plausible_ past sessions, so the `imported` flag keeps
+that history visible and separable (e.g. a Phase 5 leaderboard can count only
+live, server-verified sessions).
+
+**Alternatives considered:** _Don't import at all:_ simplest and fully
+trustworthy, but it punishes early users. _Import without rules:_ an easy way
+to grant yourself unlimited elevation. _Allow import only once:_ an extra
+rule to manage, and the overlap and pre-signup rules already make repeating
+it pointless.

@@ -5,14 +5,17 @@
  *   POST /api/sessions/:id/complete   finish                      → 200 (409 if too early)
  *   POST /api/sessions/:id/abandon    give up                     → 200
  *   GET  /api/sessions?limit&cursor   history page, newest first  → 200
+ *   POST /api/sessions/import         copy guest history in       → 200 { imported, skipped }
  *   GET  /api/climb                   climb progress              → 200
  *
  * Routes stay thin: validate input, call the service, shape the response.
  */
 import {
+  ImportSessionsInputSchema,
   ListSessionsQuerySchema,
   StartSessionInputSchema,
   type ClimbResponse,
+  type ImportResult,
   type SessionPage,
   type SessionResponse,
 } from "@summit/shared";
@@ -54,6 +57,12 @@ export function createSessionsRouter(deps: {
   router.post("/:id/abandon", async (req, res) => {
     const session = await sessions.abandon(signedInUserId(req), sessionIdFrom(req));
     const body: SessionResponse = { session };
+    res.json(body);
+  });
+
+  router.post("/import", async (req, res) => {
+    const { sessions: candidates } = validate(ImportSessionsInputSchema, req.body);
+    const body: ImportResult = await sessions.importGuestHistory(signedInUserId(req), candidates);
     res.json(body);
   });
 
