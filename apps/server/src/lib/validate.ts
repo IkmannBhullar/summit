@@ -15,12 +15,9 @@ export function validate<Schema extends z.ZodType>(
 ): z.output<Schema> {
   const result = schema.safeParse(data);
   if (!result.success) {
-    throw new HttpError(
-      400,
-      "VALIDATION_ERROR",
-      "Some fields need fixing.",
-      fieldErrors(result.error.issues),
-    );
+    throw new HttpError(400, "VALIDATION_ERROR", "Some fields need fixing.", {
+      fields: fieldErrors(result.error.issues),
+    });
   }
   return result.data;
 }

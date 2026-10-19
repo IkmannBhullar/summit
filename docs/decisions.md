@@ -433,3 +433,55 @@ revocable, but a database lookup on every request. _An auth provider
 understand and show how auth works. _Argon2:_ a newer password hash and a
 fine choice, but it needs a native build; bcrypt is still widely accepted
 at this cost.
+
+---
+
+## 018 — The server decides elevation; clients only report what happened
+
+_2026-10-18 · Phase 2_
+
+**Decision:** For signed-in users, the session API is server-authoritative:
+
+- **Start** (`POST /api/sessions`): the client sends only `{ id, plannedMinutes,
+tag }`. The server records `startedAt` from **its own clock**.
+- **Complete** (`POST /api/sessions/:id/complete`): accepted only if at least
+  `plannedMinutes` have passed **on the server's clock** since `startedAt`,
+  minus a 10-second network tolerance. Otherwise it's
+  `409 SESSION_TOO_EARLY` with a `Retry-After` header. Meters come from the
+  shared `metersEarned()`, never from the request.
+- **Abandon** earns nothing. **Climb progress** is replayed from completed
+  sessions with the shared `progressFromSessions` (decision 011).
+
+**Why:** Anything a browser sends can be faked: DevTools, a modified client,
+or a script calling the API directly. If the client said "I earned 250 m",
+anyone could claim 100,000. The server can't know whether someone _focused_,
+but it can guarantee that the planned time really passed and that meters
+follow the rules. Because both measurements (start and finish) use the
+server's clock, a wrong clock on the user's device doesn't matter. Pauses
+need no tracking: they only make a session longer, and "enough time passed"
+still holds.
+
+**Supporting choices:**
+
+- **Client-generated UUIDs as idempotency keys:** the timer starts instantly,
+  and a retried start or completion can't create duplicates or double meters.
+  An id owned by another user is refused.
+- **One running session per user**, enforced by a partial unique index
+  (`WHERE status = 'RUNNING'`). Starting a new session abandons a leftover
+  one, e.g. from a closed tab.
+- **Conditional updates** (`WHERE status = 'RUNNING'`) make simultaneous
+  complete/abandon requests safe: only one can win.
+- Another user's session returns **404, not 403**, so ids can't be probed.
+- **Cursor pagination** over `(startedAt DESC, id ASC)`, matching the index.
+- An **injectable clock** (`now`) lets tests check "10 minutes later" exactly,
+  without fake timers.
+
+**Known limits:** The server proves time passed, not attention; a user can
+start a session and walk away. The 10-second tolerance means a session can
+finish up to 10 s early, which never changes the meters earned. Imported
+guest history (step 6) can't be verified this way, so it's marked `imported`.
+
+**Alternatives considered:** _Trust the client's meters:_ trivially cheatable.
+_The server runs the timer and pushes the end:_ stronger, but it needs a
+persistent connection (that's Phase 3's rope-team model) and breaks when the
+connection drops.

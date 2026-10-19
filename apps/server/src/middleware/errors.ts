@@ -27,6 +27,10 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, _req, res, _next
     console.error(err);
   }
 
+  if (httpError.headers) {
+    res.set(httpError.headers);
+  }
+
   const body: ApiError = {
     error: {
       code: httpError.code,

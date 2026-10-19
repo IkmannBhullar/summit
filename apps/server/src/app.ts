@@ -5,7 +5,9 @@ import { createAuthMiddleware } from "./middleware/auth";
 import { installErrorHandling } from "./middleware/errors";
 import { installRequestParsing } from "./middleware/parsing";
 import { createAuthRouter, DEFAULT_AUTH_RATE_LIMIT, type RateLimitSettings } from "./routes/auth";
+import { createClimbRouter, createSessionsRouter } from "./routes/sessions";
 import { createPasswordService } from "./services/passwords";
+import { createSessionService } from "./services/sessions";
 import { createTokenService } from "./services/tokens";
 
 /** Everything the app needs from outside, passed in so tests can supply their own. */
@@ -15,6 +17,8 @@ export interface AppDependencies {
   prisma: PrismaClient;
   /** Login/register attempt limits. Tests raise or lower them as needed. */
   authRateLimit?: RateLimitSettings;
+  /** The clock. Tests pass a controllable one to make "25 minutes later" instant. */
+  now?: () => Date;
 }
 
 /**
@@ -45,6 +49,7 @@ export function createApp(deps: AppDependencies): Express {
   const passwords = createPasswordService(config.bcryptRounds);
   const tokens = createTokenService(config.jwtSecret);
   const { authenticate, requireAuth } = createAuthMiddleware(tokens);
+  const sessions = createSessionService(prisma, deps.now);
 
   // Order matters: parse requests, identify the user, then routes, then errors.
   installRequestParsing(app);
@@ -67,6 +72,9 @@ export function createApp(deps: AppDependencies): Express {
       rateLimit: deps.authRateLimit ?? DEFAULT_AUTH_RATE_LIMIT,
     }),
   );
+
+  app.use("/api/sessions", createSessionsRouter({ sessions, requireAuth }));
+  app.use("/api/climb", createClimbRouter({ sessions, requireAuth }));
 
   installErrorHandling(app);
   return app;

@@ -101,7 +101,7 @@ export function createAuthRouter(deps: AuthRouterDependencies): Router {
       // sign-ups with the same email arriving at the same moment.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new HttpError(409, "EMAIL_TAKEN", "An account with this email already exists.", {
-          email: "An account with this email already exists.",
+          fields: { email: "An account with this email already exists." },
         });
       }
       throw error;

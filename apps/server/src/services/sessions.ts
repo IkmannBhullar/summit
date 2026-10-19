@@ -1,0 +1,249 @@
+/**
+ * Focus sessions, with the server as the source of truth.
+ *
+ * The client only reports what happened ("started", "finished", "gave up").
+ * The server decides everything that matters for elevation:
+ * - `startedAt` comes from the SERVER's clock when the start arrives.
+ * - A session can only complete once its planned minutes have really passed
+ *   on the server's clock since then (minus a small network tolerance).
+ * - Meters are calculated here with the shared `metersEarned`, never read
+ *   from the request.
+ *
+ * Pauses need no special handling: they only make a session take longer,
+ * so "enough time has passed" still holds.
+ */
+import {
+  metersEarned,
+  progressFromSessions,
+  type ClimbProgress,
+  type FocusSession,
+  type ListSessionsQuery,
+  type SessionPage,
+  type StartSessionInput,
+} from "@summit/shared";
+import { z } from "zod";
+import type { PrismaClient } from "../db/client";
+import { Prisma, type FocusSession as SessionRow } from "../generated/prisma/client";
+import { HttpError } from "../lib/httpError";
+
+/**
+ * How much earlier than its planned length a completion may arrive.
+ *
+ * The server records `startedAt` when the start request ARRIVES, which is a
+ * little after the user clicked Start. If the start request was slower than
+ * the completion request, the server measures slightly less than the real
+ * time. 10 seconds absorbs that without letting anyone skip real focus time.
+ */
+export const COMPLETION_TOLERANCE_MS = 10_000;
+
+const MS_PER_MINUTE = 60_000;
+
+/** Converts a database row into the shared FocusSession shape the API returns. */
+export function toSessionDto(row: SessionRow): FocusSession {
+  return {
+    id: row.id,
+    plannedMinutes: row.plannedMinutes,
+    startedAt: row.startedAt.toISOString(),
+    endedAt: row.endedAt?.toISOString() ?? null,
+    status: row.status,
+    tag: row.tag,
+    metersGained: row.metersGained,
+    roomId: row.roomId,
+  };
+}
+
+// --- Pagination cursors -----------------------------------------------------
+// History is ordered newest first by (startedAt DESC, id ASC). A cursor is the
+// position of the last session on a page, encoded as base64url JSON so it's
+// opaque to clients: they pass it back without needing to understand it.
+
+const CursorSchema = z.object({ startedAt: z.iso.datetime(), id: z.uuid() });
+type Cursor = z.infer<typeof CursorSchema>;
+
+export function encodeCursor(row: Pick<SessionRow, "startedAt" | "id">): string {
+  const cursor: Cursor = { startedAt: row.startedAt.toISOString(), id: row.id };
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+function decodeCursor(text: string): Cursor {
+  try {
+    return CursorSchema.parse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+  } catch {
+    throw new HttpError(400, "VALIDATION_ERROR", "Some fields need fixing.", {
+      fields: { cursor: "Invalid cursor." },
+    });
+  }
+}
+
+// --- The service ------------------------------------------------------------
+
+export interface SessionService {
+  /** Starts a session. `created` is false when the same id was already started (a retry). */
+  start: (
+    userId: string,
+    input: StartSessionInput,
+  ) => Promise<{ session: FocusSession; created: boolean }>;
+  complete: (userId: string, sessionId: string) => Promise<FocusSession>;
+  abandon: (userId: string, sessionId: string) => Promise<FocusSession>;
+  /** One page of finished sessions, newest first. */
+  history: (userId: string, query: ListSessionsQuery) => Promise<SessionPage>;
+  /** Climb progress, replayed from the user's completed sessions. */
+  climb: (userId: string) => Promise<ClimbProgress>;
+}
+
+const notFound = () => new HttpError(404, "NOT_FOUND", "Session not found.");
+
+/**
+ * @param now - The clock. Production passes the real one; tests pass a
+ *   controllable one, so "25 minutes later" is exact and instant.
+ */
+export function createSessionService(
+  prisma: PrismaClient,
+  now: () => Date = () => new Date(),
+): SessionService {
+  /** The user's session with this id, or 404 (also when it belongs to someone else). */
+  async function findOwn(userId: string, sessionId: string): Promise<SessionRow> {
+    const row = await prisma.focusSession.findFirst({ where: { id: sessionId, userId } });
+    if (!row) throw notFound();
+    return row;
+  }
+
+  /** A start that reuses an existing id: a retry (same user) or a clash (another user). */
+  function existingStart(row: SessionRow, userId: string) {
+    if (row.userId !== userId) {
+      throw new HttpError(409, "CONFLICT", "That session id is already in use.");
+    }
+    return { session: toSessionDto(row), created: false };
+  }
+
+  return {
+    async start(userId, input) {
+      // Idempotency: the client chose the id, so a retried request finds it.
+      const existing = await prisma.focusSession.findUnique({ where: { id: input.id } });
+      if (existing) return existingStart(existing, userId);
+
+      const startedAt = now();
+      try {
+        const row = await prisma.$transaction(async (tx) => {
+          // Only one running session per user (the database enforces it too):
+          // starting a new one gives up any session that's still running,
+          // e.g. from a tab that was closed without finishing.
+          await tx.focusSession.updateMany({
+            where: { userId, status: "RUNNING" },
+            data: { status: "ABANDONED", endedAt: startedAt, metersGained: 0 },
+          });
+          return tx.focusSession.create({
+            data: {
+              id: input.id,
+              userId,
+              plannedMinutes: input.plannedMinutes,
+              tag: input.tag,
+              startedAt,
+              status: "RUNNING",
+            },
+          });
+        });
+        return { session: toSessionDto(row), created: true };
+      } catch (error) {
+        // Two identical starts racing each other: the second hits the
+        // primary key. Treat it as the retry it is.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          const raced = await prisma.focusSession.findUnique({ where: { id: input.id } });
+          if (raced) return existingStart(raced, userId);
+          throw new HttpError(409, "CONFLICT", "Another session was started at the same time.");
+        }
+        throw error;
+      }
+    },
+
+    async complete(userId, sessionId) {
+      const row = await findOwn(userId, sessionId);
+      // Idempotent: completing twice (e.g. a retried request) changes nothing.
+      if (row.status === "COMPLETED") return toSessionDto(row);
+      if (row.status !== "RUNNING") {
+        throw new HttpError(409, "CONFLICT", "This session was abandoned and can't be completed.");
+      }
+
+      // THE anti-cheat check: has enough real time passed, by OUR clock?
+      const endedAt = now();
+      const elapsedMs = endedAt.getTime() - row.startedAt.getTime();
+      const requiredMs = row.plannedMinutes * MS_PER_MINUTE - COMPLETION_TOLERANCE_MS;
+      if (elapsedMs < requiredMs) {
+        const waitSeconds = Math.ceil((requiredMs - elapsedMs) / 1000);
+        throw new HttpError(
+          409,
+          "SESSION_TOO_EARLY",
+          `This session isn't finished yet: ${waitSeconds}s to go.`,
+          { headers: { "Retry-After": String(waitSeconds) } },
+        );
+      }
+
+      // Conditional update: only succeeds if it's STILL running, so two
+      // simultaneous completions can't both apply.
+      const { count } = await prisma.focusSession.updateMany({
+        where: { id: sessionId, userId, status: "RUNNING" },
+        data: {
+          status: "COMPLETED",
+          endedAt,
+          metersGained: metersEarned("COMPLETED", row.plannedMinutes),
+        },
+      });
+      const updated = await findOwn(userId, sessionId);
+      if (count === 0 && updated.status !== "COMPLETED") {
+        throw new HttpError(409, "CONFLICT", "This session was abandoned and can't be completed.");
+      }
+      return toSessionDto(updated);
+    },
+
+    async abandon(userId, sessionId) {
+      const row = await findOwn(userId, sessionId);
+      // Idempotent: giving up twice changes nothing.
+      if (row.status === "ABANDONED") return toSessionDto(row);
+      if (row.status === "COMPLETED") {
+        throw new HttpError(409, "CONFLICT", "This session is already complete.");
+      }
+
+      await prisma.focusSession.updateMany({
+        where: { id: sessionId, userId, status: "RUNNING" },
+        data: { status: "ABANDONED", endedAt: now(), metersGained: 0 },
+      });
+      return toSessionDto(await findOwn(userId, sessionId));
+    },
+
+    async history(userId, query) {
+      const after = query.cursor ? decodeCursor(query.cursor) : undefined;
+      const rows = await prisma.focusSession.findMany({
+        where: {
+          userId,
+          status: { in: ["COMPLETED", "ABANDONED"] },
+          // "After the cursor" in our ordering: older, or the same instant
+          // with a later id (ids break ties between equal timestamps).
+          ...(after && {
+            OR: [
+              { startedAt: { lt: new Date(after.startedAt) } },
+              { startedAt: new Date(after.startedAt), id: { gt: after.id } },
+            ],
+          }),
+        },
+        orderBy: [{ startedAt: "desc" }, { id: "asc" }],
+        // Ask for one extra row: if it exists, there's another page.
+        take: query.limit + 1,
+      });
+
+      const page = rows.slice(0, query.limit);
+      const last = page.at(-1);
+      return {
+        sessions: page.map(toSessionDto),
+        nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null,
+      };
+    },
+
+    async climb(userId) {
+      const rows = await prisma.focusSession.findMany({
+        where: { userId, status: "COMPLETED" },
+      });
+      // The same shared, already-tested function the browser uses.
+      return progressFromSessions(rows.map(toSessionDto));
+    },
+  };
+}
