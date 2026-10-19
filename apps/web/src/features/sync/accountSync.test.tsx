@@ -153,7 +153,10 @@ describe("signed in", () => {
       "POST /api/sessions",
       expect.stringMatching(/^POST \/api\/sessions\/.+\/complete$/),
     ]);
-    expect(within(history()).getByText("+250 m")).toBeInTheDocument();
+    // History and climb are re-fetched in parallel; the climb can arrive
+    // first, so wait for history separately (checking it right away made
+    // this test fail now and then).
+    expect(await within(history()).findByText("+250 m")).toBeInTheDocument();
     // The account was used: nothing was written to this device's guest history.
     expect(JSON.parse(localStorage.getItem("summit:sessions") ?? "[]")).toEqual([]);
   });

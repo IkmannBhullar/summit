@@ -9,13 +9,13 @@ export interface SessionHistory {
   sessions: FocusSession[];
   /** Records a finished session. Adding the same session id twice is ignored. */
   addSession: (session: FocusSession) => void;
+  /** Forgets every session (e.g. after importing them into an account). */
+  clear: () => void;
 }
 
 /**
- * The user's session history, kept in localStorage.
- *
- * In Phase 2 this becomes an API call; components only see `sessions` and
- * `addSession`, so they won't need to change.
+ * A guest's session history, kept in this browser's localStorage.
+ * (Signed-in users' history comes from the API; see useSessionStore.)
  */
 export function useSessionHistory(): SessionHistory {
   // Read storage once, on the first render. Invalid entries are dropped
@@ -38,5 +38,7 @@ export function useSessionHistory(): SessionHistory {
     );
   }, []);
 
-  return { sessions, addSession };
+  const clear = useCallback(() => setSessions([]), []);
+
+  return { sessions, addSession, clear };
 }

@@ -12,7 +12,7 @@
 import { progressFromSessions, type ClimbProgress, type FocusSession } from "@summit/shared";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
-import { useSessionHistory } from "../history/useSessionHistory";
+import { useSessionHistory, type SessionHistory } from "../history/useSessionHistory";
 import type { TimerEvent } from "../timer/timerMachine";
 import {
   abandonSession,
@@ -39,8 +39,8 @@ export interface SessionStore {
 }
 
 /** Guests: history in localStorage, progress replayed in the browser. */
-function useGuestStore(): SessionStore {
-  const { sessions, addSession } = useSessionHistory();
+function useGuestStore(guestHistory: SessionHistory): SessionStore {
+  const { sessions, addSession } = guestHistory;
   const progress = useMemo(() => progressFromSessions(sessions), [sessions]);
 
   const handleTimerEvent = useCallback(
@@ -145,11 +145,22 @@ function useAccountStore(enabled: boolean): SessionStore {
   };
 }
 
-/** The right store for who's using the app. */
-export function useSessionStore(signedIn: boolean): SessionStore {
+/**
+ * The right store for who's using the app, plus this device's guest history
+ * (so a signed-in user can import it, see useGuestImport).
+ *
+ * There's exactly ONE guest-history instance: two copies of the hook would
+ * each keep their own state, and clearing one could be undone when the
+ * other saved its stale copy back to storage.
+ */
+export function useSessionStore(signedIn: boolean): {
+  store: SessionStore;
+  guestHistory: SessionHistory;
+} {
+  const guestHistory = useSessionHistory();
   // Hooks can't be called conditionally, so both exist; the account one
   // only fetches when someone is signed in.
-  const guest = useGuestStore();
+  const guest = useGuestStore(guestHistory);
   const account = useAccountStore(signedIn);
-  return signedIn ? account : guest;
+  return { store: signedIn ? account : guest, guestHistory };
 }

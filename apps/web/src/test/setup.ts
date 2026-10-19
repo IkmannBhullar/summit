@@ -1,17 +1,11 @@
 // Test setup, loaded before every web test file (see vite.config.ts → test.setupFiles).
-import { cleanup, configure } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { server } from "./server";
 
 // Adds DOM-specific matchers like toBeInTheDocument() and toHaveTextContent()
 // to Vitest's expect().
 import "@testing-library/jest-dom/vitest";
-
-// findBy… queries and waitFor() give up after this long. The default (1 s)
-// is tight for flows with several network round trips while many test files
-// run in parallel, as on CI machines. Tests still finish as soon as the
-// condition is met; this only changes how long a failing check waits.
-configure({ asyncUtilTimeout: 3000 });
 
 // The fake API (see server.ts). "error" for unhandled requests ("frames" in
 // MSW 3, which also covers WebSockets) means any

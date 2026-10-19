@@ -1,10 +1,13 @@
 /** The session endpoints, as typed functions (signed-in users only). */
 import {
   ClimbResponseSchema,
+  ImportResultSchema,
+  MAX_IMPORT_SESSIONS,
   SessionPageSchema,
   SessionResponseSchema,
   type ClimbProgress,
   type FocusSession,
+  type ImportResult,
   type SessionPage,
   type StartSessionInput,
 } from "@summit/shared";
@@ -43,6 +46,24 @@ export function fetchHistoryPage(cursor: string | null, limit = 50): Promise<Ses
 export async function fetchClimb(): Promise<ClimbProgress> {
   const { progress } = await apiRequest("/api/climb", { schema: ClimbResponseSchema });
   return progress;
+}
+
+/**
+ * Imports guest sessions into the account, in batches the server accepts
+ * (at most MAX_IMPORT_SESSIONS per request), and adds up the results.
+ */
+export async function importSessions(sessions: readonly FocusSession[]): Promise<ImportResult> {
+  const total: ImportResult = { imported: 0, skipped: 0 };
+  for (let start = 0; start < sessions.length; start += MAX_IMPORT_SESSIONS) {
+    const result = await apiRequest("/api/sessions/import", {
+      method: "POST",
+      body: { sessions: sessions.slice(start, start + MAX_IMPORT_SESSIONS) },
+      schema: ImportResultSchema,
+    });
+    total.imported += result.imported;
+    total.skipped += result.skipped;
+  }
+  return total;
 }
 
 /**

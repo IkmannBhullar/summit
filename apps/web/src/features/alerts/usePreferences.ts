@@ -8,12 +8,19 @@ export const PreferencesSchema = z.object({
   soundEnabled: z.boolean(),
   /** The user said "Not now" to notifications (or already answered); don't ask again. */
   notificationPromptDismissed: z.boolean(),
+  /**
+   * Accounts (by id) that said "Not now" to importing this device's guest
+   * history. `.default([])` keeps preferences saved before this field
+   * existed valid, instead of resetting them all.
+   */
+  importDeclinedFor: z.array(z.string()).default([]),
 });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
 export const DEFAULT_PREFERENCES: Preferences = {
   soundEnabled: true,
   notificationPromptDismissed: false,
+  importDeclinedFor: [],
 };
 
 const STORAGE_KEY = "preferences";

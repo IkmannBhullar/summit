@@ -12,6 +12,8 @@ import { MountainView } from "../features/climb/MountainView";
 import { SummitCelebration } from "../features/climb/SummitCelebration";
 import { useSummitCelebration } from "../features/climb/useSummitCelebration";
 import { HistoryList } from "../features/history/HistoryList";
+import { ImportPrompt } from "../features/sync/ImportPrompt";
+import { useGuestImport } from "../features/sync/useGuestImport";
 import { useSessionStore } from "../features/sync/useSessionStore";
 import type { TimerEvent } from "../features/timer/timerMachine";
 import { TimerScreen } from "../features/timer/TimerScreen";
@@ -37,12 +39,16 @@ export function TimerPage() {
 
   // `key`: switching between guest and an account remounts the page, so
   // nothing (like the summits already celebrated) carries over between them.
-  return <TimerPageContent key={user?.id ?? "guest"} signedIn={Boolean(user)} />;
+  return <TimerPageContent key={user?.id ?? "guest"} userId={user?.id ?? null} />;
 }
 
-function TimerPageContent({ signedIn }: { signedIn: boolean }) {
+function TimerPageContent({ userId }: { userId: string | null }) {
   const { settings, preferences, updatePreferences } = useShell();
-  const store = useSessionStore(signedIn);
+  const { store, guestHistory } = useSessionStore(userId !== null);
+  const guestImport = useGuestImport({
+    guestHistory,
+    declined: userId !== null && preferences.importDeclinedFor.includes(userId),
+  });
   const now = useNow();
   // The browser's notification permission, re-read after we ask.
   const [notifications, setNotifications] = useState(notificationStatus);
@@ -104,6 +110,14 @@ function TimerPageContent({ signedIn }: { signedIn: boolean }) {
           >
             {store.syncProblem}
           </p>
+        )}
+        {userId !== null && (
+          <ImportPrompt
+            guestImport={guestImport}
+            onDecline={() =>
+              updatePreferences({ importDeclinedFor: [...preferences.importDeclinedFor, userId] })
+            }
+          />
         )}
         {showNotificationPrompt && (
           <NotificationPrompt
