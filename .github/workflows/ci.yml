@@ -28,6 +28,29 @@ jobs:
     # Fail fast instead of hanging for GitHub's 6-hour default if something gets stuck.
     timeout-minutes: 10
 
+    # A real Postgres for the server's database tests: the same image and
+    # version as docker-compose.yml, running next to the job. GitHub starts it
+    # before the steps and waits until the health check passes.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: summit
+          POSTGRES_PASSWORD: summit # throwaway CI-only database, not a secret
+          POSTGRES_DB: summit
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U summit"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Where the server tests' global setup creates, migrates, and seeds the
+      # test database (the name must end in _test).
+      TEST_DATABASE_URL: postgresql://summit:summit@localhost:5434/summit_test
+
     steps:
       # Download the repo's code onto the CI machine.
       - name: Check out code
@@ -46,6 +69,11 @@ jobs:
       # never `npm install`, which may quietly change the lockfile.
       - name: Install dependencies
         run: npm ci
+
+      # The Prisma client is generated from schema.prisma (it's not committed).
+      # Lint needs it too: type-aware rules must see the client's real types.
+      - name: Generate Prisma client
+        run: npm run db:generate -w apps/server
 
       # Ordered from fastest to slowest, so cheap mistakes fail first.
       - name: Check formatting

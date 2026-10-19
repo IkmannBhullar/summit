@@ -9,6 +9,8 @@ build/
 dev-dist/
 # TypeScript incremental build cache
 *.tsbuildinfo
+# Prisma client, generated from schema.prisma by `prisma generate`
+apps/server/src/generated/
 
 # --- Test output ---
 coverage/

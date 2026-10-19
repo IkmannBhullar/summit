@@ -7,6 +7,6 @@
     // @types package it finds in node_modules.
     "types": ["node"]
   },
-  // Source and co-located tests.
-  "include": ["src"]
+  // Source, co-located tests, the Prisma config, and the seed script.
+  "include": ["src", "prisma", "prisma.config.ts", "vitest.config.ts"]
 }

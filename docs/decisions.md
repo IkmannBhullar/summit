@@ -345,3 +345,39 @@ public APIs with many consumers, but it's a second source of truth and a
 build step for a project with one client. _tRPC:_ end-to-end types with less
 boilerplate, but it hides the HTTP API, and a plain REST design is more
 useful to learn and demonstrate here.
+
+---
+
+## 016 — Prisma 7 with migrations, database CHECKs, and a real test database
+
+_2026-10-18 · Phase 2_
+
+**Decision:**
+
+- **Prisma 7.10** (the stable line; `latest` pointed at an 8.0 release
+  candidate) with its TypeScript-native client and the `pg` driver adapter.
+  The client is generated into `src/generated/` and not committed.
+- Schema changes only happen through **migrations** (`prisma/migrations/`),
+  applied with `migrate deploy` everywhere but local development.
+- The first migration adds **hand-written CHECK constraints** that Prisma's
+  schema language can't express: minute limits, non-negative meters, "only
+  completed sessions earn meters", end-after-start, lowercase emails.
+- **Climb progress isn't stored** (no Climb table). It's derived from
+  sessions, as in decision 011. Peaks are seeded from shared `PEAKS` so SQL
+  can join on them.
+- Server tests run against a **real Postgres database** (`summit_test`)
+  that global setup creates, migrates, and seeds. Tables are truncated
+  before each test, and test files run one at a time. Setup refuses any
+  database whose name doesn't end in `_test`. CI runs the same Postgres
+  version as a service container.
+
+**Why:** CHECK constraints are defense in depth: the database rejects
+impossible data even if application code has a bug. A real test database
+catches what mocks can't: wrong queries, constraint violations, and
+migration mistakes.
+
+**Alternatives considered:** _Mocking Prisma in tests:_ faster, but it
+can't fail on a broken query. _A separate Docker container for tests:_
+cleaner isolation, but heavier; a second database in the same Postgres is
+enough. _Drizzle or Kysely:_ lighter and closer to SQL, but Prisma's
+schema-first migrations and generated types are a good fit for learning.

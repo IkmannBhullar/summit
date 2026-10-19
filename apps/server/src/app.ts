@@ -1,11 +1,14 @@
 import express, { type Express } from "express";
 import type { Config } from "./config/env";
+import type { PrismaClient } from "./db/client";
 import { installErrorHandling } from "./middleware/errors";
 import { installRequestParsing } from "./middleware/parsing";
 
-/** Everything the app needs from outside. Phase 2 adds the database client here. */
+/** Everything the app needs from outside, passed in so tests can supply their own. */
 export interface AppDependencies {
   config: Config;
+  /** Database client. Tests pass one connected to the test database. */
+  prisma: PrismaClient;
 }
 
 /**

@@ -105,7 +105,7 @@ source. See [decisions 001–002](docs/decisions.md).
 
 - **Node 24** (the version in [`.nvmrc`](.nvmrc)). With
   [nvm](https://github.com/nvm-sh/nvm): `nvm install` and then `nvm use` in the repo root.
-- **Docker Desktop**, for the local Postgres database (not needed until Phase 2).
+- **Docker Desktop**, for the local Postgres database.
 
 ### Setup from a fresh clone
 
@@ -125,9 +125,17 @@ cp .env.example .env
 cp apps/server/.env.example apps/server/.env
 cp apps/web/.env.example apps/web/.env
 
-# 5. Optional for now: start Postgres in the background
+# 5. Start Postgres in the background
 docker compose up -d
+
+# 6. Create the tables (runs every migration) and add the peaks
+npm run db:deploy -w apps/server
+npm run db:seed -w apps/server
 ```
+
+Server tests use their own database, `summit_test`, in the same Postgres.
+They create, migrate, and seed it automatically, so `npm test` only needs
+Postgres to be running.
 
 ### Run it
 
@@ -185,6 +193,16 @@ Web-only scripts (add `-w apps/web`):
 | `npm run preview`        | Serve the production build locally                                                                                 |
 | `npm run check:offline`  | Headless Chrome check: installable + works offline (needs a build and a local Chrome; set `CHROME_PATH` if needed) |
 | `npm run generate-icons` | Regenerate the PNG app icons from `public/icon.svg`                                                                |
+
+Database scripts (add `-w apps/server`):
+
+| Command               | What it does                                                                   |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `npm run db:migrate`  | After editing `schema.prisma`: create and apply a new migration                |
+| `npm run db:deploy`   | Apply existing migrations (fresh clones, CI, production)                       |
+| `npm run db:seed`     | Insert or update the peaks (safe to re-run)                                    |
+| `npm run db:generate` | Regenerate the typed Prisma client (tests and typecheck do this automatically) |
+| `npm run db:studio`   | Browse the database in Prisma Studio                                           |
 
 CI runs `npm ci`, then format check, lint, typecheck, tests, and the web build,
 in that order.
