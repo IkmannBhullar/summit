@@ -64,6 +64,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
         // Any page URL loads the app shell, so deep links work offline too.
         navigateFallback: "index.html",
+        // ...except API URLs, which must always reach the server.
+        navigateFallbackDenylist: [/^\/api\//],
         // Delete caches from older service worker versions.
         cleanupOutdatedCaches: true,
       },

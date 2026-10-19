@@ -521,3 +521,50 @@ trustworthy, but it punishes early users. _Import without rules:_ an easy way
 to grant yourself unlimited elevation. _Allow import only once:_ an extra
 rule to manage, and the overlap and pre-signup rules already make repeating
 it pointless.
+
+---
+
+## 020 — Web auth: React Router, TanStack Query, and an MSW-mocked API in tests
+
+_2026-10-19 · Phase 2_
+
+**Decision:**
+
+- **React Router** (data router) for pages: `/`, `/login`, `/register`, and a
+  protected `/account`. A layout route holds the header and app-wide dialogs;
+  pages get shared state through the outlet context.
+- **TanStack Query** caches server data. The signed-in user is one cache entry
+  (`["auth", "me"]`): fetched once, shared everywhere, updated directly by
+  login and logout. Client errors (4xx) are never retried; mutations are never
+  retried automatically.
+- **One API client** (`lib/api.ts`) for every request: JSON, cookies
+  (`credentials: "include"`), typed `ApiRequestError`s, and response
+  validation with the shared schemas.
+- **Guests are first-class.** "Not signed in" is `null`, not an error, and the
+  timer works even when the API can't be reached (offline PWA).
+- **`RequireAuth` decides where you go when the user disappears:** a guest
+  arriving at a protected page goes to `/login` (and comes back after
+  signing in); a user who signs out _while on it_ goes home.
+- **Tests mock the network with MSW**, so they exercise the real client,
+  router, and pages. Unhandled requests fail the test (`onUnhandledFrame:
+"error"`; MSW 3 renamed it from `onUnhandledRequest`, and the typecheck
+  caught the old name being silently ignored).
+
+**A bug worth remembering:** signing out from `/account` first did
+"log out, then navigate home". That raced with `RequireAuth`, which saw "no
+user" and redirected to `/login`; which one won depended on render timing,
+so the test failed in about half of the full-suite runs. Two timing fixes
+(awaiting the navigation, then `flushSync`) only made it rarer. The fix that
+worked removed the race: the guard itself knows whether it saw a user, so
+signing out needs no navigation of its own. The test then passed 8 of 8 full runs.
+
+**Alternatives considered:** _Hand-written fetch hooks:_ no dependency, but
+re-implementing caching, deduplication, and retries. _SWR:_ similar to
+TanStack Query, with a smaller API but fewer mutation tools. _Mocking
+`fetch` with `vi.fn`:_ simpler, but it skips the real request and response
+handling that MSW exercises.
+
+**Follow-ups:** The bundle is now about 181 kB gzipped; lazy-loading the auth
+pages would keep the timer's first load lean. Moving focus to the new page's
+heading on navigation (for screen readers) belongs in Phase 4's
+accessibility pass.
