@@ -168,6 +168,11 @@ builds, and CI on a clean clone. Both packages already ship prebuilt binaries.
 **Revisit if:** a tool fails with a missing-binary error. Then run
 `npm install-scripts approve <pkg>` for that package only.
 
+**Update (Phase 2):** Prisma added two more blocked scripts, `@prisma/engines`
+(downloads the schema engine) and `prisma` (a version check). Generating the
+client, migrating, and seeding all work without them, locally and in CI, so
+they stay blocked too.
+
 ---
 
 ## 009 — Extra meters past a summit carry over to the next peak

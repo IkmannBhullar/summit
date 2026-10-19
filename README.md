@@ -4,15 +4,17 @@
 
 **A focus timer where every focus minute climbs a real mountain.** Finish a
 25-minute session and your climber gains 250 m on Mt. Fuji; give up early and
-you slide back down. Coming next: friends rope up in live rooms and climb
-together, and if anyone quits early, the whole team slips.
+you slide back down. Sign in and your climb is saved to your account, with
+the server checking every meter. Coming next: friends rope up in live rooms
+and climb together, and if anyone quits early, the whole team slips.
 
-> **Status:** Phase 1 complete. The solo timer is fully playable, installable,
-> and works offline (no backend yet). See [the roadmap](#roadmap).
+> **Status:** Phase 2 complete. Accounts, a Postgres backend, and
+> server-verified elevation, on top of the installable, offline-capable solo
+> timer from Phase 1. See [the roadmap](#roadmap).
 
 ## Features
 
-### Working now (Phase 1)
+### Working now
 
 - **Focus timer** with a configurable focus / short break / long break rhythm
   (default 25 / 5 / 15, long break after every 4th session). Start, pause,
@@ -33,11 +35,18 @@ together, and if anyone quits early, the whole team slips.
 - **Mobile-first and accessible:** fits a 320 px phone without scrolling to the
   Start button, 44 px tap targets, screen-reader labels, light/dark mode, and
   reduced-motion support.
+- **Accounts** (Phase 2): sign up, sign in, and a profile page. Your sessions,
+  history, and climb live on the server, so they follow you across devices.
+- **Elevation the server can vouch for:** when you're signed in, the server
+  times every session with its own clock and calculates the meters itself, so
+  they can't be faked from the browser.
+- **Bring your guest climb along:** after signing in, the app offers to import
+  the sessions you did on this device as a guest.
+- **Guests stay first-class:** no account needed, and the guest timer appears
+  instantly, even when the server is asleep or unreachable.
 
 ### Planned
 
-- **Accounts and sync** (Phase 2): the server stores sessions and calculates
-  elevation, so it can't be faked from the browser.
 - **Rope team rooms** (Phase 3): join friends with a 6-character code for a
   server-synced session. If anyone leaves early, the team slips.
 - **Stats** (Phase 4): streaks, a calendar heatmap, focus by hour, and tags like
@@ -50,30 +59,45 @@ together, and if anyone quits early, the whole team slips.
   whenever the tab becomes visible again, so throttled background tabs and
   sleeping laptops can't make it wrong.
   ([decision 010](docs/decisions.md#010--timer-as-a-pure-state-machine-side-effects-as-events-outside-react))
+- **Server-authoritative elevation.** Clients only report "started" and
+  "finished". The server records the start with its own clock, refuses a
+  completion until the planned time has really passed (`409` with
+  `Retry-After`), and calculates the meters. Pauses need no tracking: they only
+  make a session longer.
+  ([decision 018](docs/decisions.md#018--the-server-decides-elevation-clients-only-report-what-happened))
 - **Rules as pure, shared code.** The timer is a pure state machine, and
-  elevation and summits come from pure functions in `packages/shared`. They're
-  testable without fake timers and ready for the server to reuse in Phase 2.
+  elevation and summits come from pure functions in `packages/shared`, which
+  the browser and the server both run. One API contract (Zod schemas) is
+  shared too, so a mismatch is a type error, not a production bug.
 - **One source of truth.** Climb progress is replayed from session history
   instead of stored separately, so the two can never disagree.
   ([decision 011](docs/decisions.md#011--climb-progress-is-derived-from-session-history-not-stored))
-- **Untrusted input is validated.** Everything read from `localStorage` goes
-  through Zod schemas, including anti-tamper rules (e.g. a session can't claim
-  more meters than it earned, or end earlier than it was allowed to).
+- **Untrusted input is validated, in layers.** Every request and everything
+  read from `localStorage` goes through Zod schemas, with anti-tamper rules
+  (a session can't claim meters it didn't earn), and Postgres CHECK
+  constraints back them up.
+- **Careful auth.** bcrypt password hashes, a JWT in an `HttpOnly`,
+  `SameSite=Lax` cookie, rate-limited logins, and the same answer _and the
+  same response time_ for "no such account" and "wrong password".
+  ([decision 017](docs/decisions.md#017--auth-bcrypt-hashes-a-jwt-in-an-httponly-cookie-rate-limited))
+- **Safe to retry.** Session ids are UUIDs created in the browser, so a
+  retried request can't create a duplicate or double the meters, and the
+  client retries temporary failures on its own.
 - **Offline verified in a real browser.** `npm run check:offline -w apps/web`
   drives headless Chrome to check installability, then reloads with the server
   stopped and the network cut.
 
 ## Tech stack
 
-| Area     | Tools                                                                               |
-| -------- | ----------------------------------------------------------------------------------- |
-| Web      | React 19, TypeScript, Vite, Tailwind CSS v4, Motion, vite-plugin-pwa                |
-| Server   | Node 24, Express 5, TypeScript                                                      |
-| Shared   | `@summit/shared`: game rules, peaks, and Zod schemas used by both sides             |
-| Database | PostgreSQL 17 (Docker Compose locally)                                              |
-| Quality  | Vitest, React Testing Library, user-event, Supertest, ESLint (type-aware), Prettier |
-| CI       | GitHub Actions: format, lint, typecheck, test, build on every push/PR               |
-| Planned  | Prisma, Socket.io, Vercel + Render, then AWS with Terraform                         |
+| Area     | Tools                                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------------------- |
+| Web      | React 19, TypeScript, Vite, Tailwind CSS v4, Motion, React Router, TanStack Query, vite-plugin-pwa               |
+| Server   | Node 24, Express 5, TypeScript, Prisma 7, bcryptjs, jose (JWT), express-rate-limit                               |
+| Shared   | `@summit/shared`: game rules, peaks, and the Zod API contract used by both sides                                 |
+| Database | PostgreSQL 17 (Docker Compose locally), migrations with Prisma                                                   |
+| Quality  | Vitest, React Testing Library, user-event, MSW, Supertest against a real Postgres, ESLint (type-aware), Prettier |
+| CI       | GitHub Actions with a Postgres service: format, lint, typecheck, test, build                                     |
+| Planned  | Socket.io (Phase 3), Vercel + Render (Phase 4), then AWS with Terraform                                          |
 
 ## Repository layout
 
@@ -84,15 +108,22 @@ summit/
 │   │   ├── public/             # App icons (generated from icon.svg)
 │   │   ├── scripts/            # check-offline.mjs (headless Chrome PWA check)
 │   │   └── src/
-│   │       ├── components/     # Shared UI: Modal, ConfirmDialog
-│   │       ├── features/       # timer, climb, history, settings, alerts, pwa
-│   │       └── lib/            # storage, dates, useNow
-│   └── server/                 # Express API (health route so far)
+│   │       ├── components/     # Shared UI: Modal, ConfirmDialog, TextField
+│   │       ├── features/       # timer, climb, history, settings, alerts, pwa, auth, sync
+│   │       ├── pages/          # Timer page and the centered page layout
+│   │       └── lib/            # API client, query client, storage, dates
+│   └── server/                 # Express API
+│       ├── prisma/             # schema.prisma, migrations, peaks seed
+│       └── src/
+│           ├── routes/         # auth, sessions, climb
+│           ├── services/       # passwords, tokens, sessions, import rules
+│           ├── middleware/     # parsing, auth, errors
+│           └── config/         # validated environment
 ├── packages/
-│   └── shared/                 # Peaks, climb progression, schemas
+│   └── shared/                 # Peaks, climb progression, schemas, API contract
 ├── docs/decisions.md           # Architecture decision log
 ├── .github/workflows/          # CI pipeline
-└── docker-compose.yml          # Local Postgres (used from Phase 2)
+└── docker-compose.yml          # Local Postgres
 ```
 
 This is an **npm workspaces** monorepo. One `npm install` at the root installs
@@ -139,17 +170,19 @@ Postgres to be running.
 
 ### Run it
 
-The Phase 1 app runs entirely in the browser:
+In two terminals (with Postgres running):
 
 ```bash
-npm run dev -w apps/web      # http://localhost:5173
+npm run dev -w apps/server   # API at http://localhost:4000 (try /health)
 ```
-
-The API (just a health check so far) runs separately:
 
 ```bash
-npm run dev -w apps/server   # http://localhost:4000/health
+npm run dev -w apps/web      # App at http://localhost:5173
 ```
+
+The web dev server forwards `/api/...` to the API (see `vite.config.ts`), so
+the browser talks to one origin and no CORS setup is needed. As a guest you
+can use the timer with only the web app running; signing in needs the API.
 
 ### Install it as an app
 
@@ -170,6 +203,27 @@ bar. After that, the installed app works with no server and no network.
 | Web (build) | `http://localhost:4173` | `vite preview --port`            |
 | API         | `http://localhost:4000` | `PORT` in `apps/server/.env`     |
 | Postgres    | `localhost:5434`        | `POSTGRES_PORT` in `.env` (root) |
+
+## API overview
+
+Every request and response is defined by a Zod schema in
+`packages/shared/src/api/`. Errors always look like
+`{ "error": { "code", "message", "fields"? } }`.
+
+| Endpoint                          | What it does                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `POST /api/auth/register`         | Create an account and sign in (sets the `HttpOnly` cookie)                        |
+| `POST /api/auth/login`            | Sign in (rate-limited per IP)                                                     |
+| `POST /api/auth/logout`           | Sign out (clears the cookie)                                                      |
+| `GET /api/auth/me`                | The signed-in user, or `401`                                                      |
+| `POST /api/sessions`              | Start a session (`{ id, plannedMinutes, tag }`); the server sets `startedAt`      |
+| `POST /api/sessions/:id/complete` | Finish; `409 SESSION_TOO_EARLY` + `Retry-After` if the planned time hasn't passed |
+| `POST /api/sessions/:id/abandon`  | Give up (earns nothing)                                                           |
+| `GET /api/sessions?limit&cursor`  | History, newest first, cursor-paginated                                           |
+| `POST /api/sessions/import`       | Import guest history (up to 1,000, with plausibility rules)                       |
+| `GET /api/climb`                  | Climb progress, derived from completed sessions                                   |
+
+All session and climb routes require sign-in.
 
 ## Scripts
 
@@ -196,13 +250,13 @@ Web-only scripts (add `-w apps/web`):
 
 Database scripts (add `-w apps/server`):
 
-| Command               | What it does                                                                   |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `npm run db:migrate`  | After editing `schema.prisma`: create and apply a new migration                |
-| `npm run db:deploy`   | Apply existing migrations (fresh clones, CI, production)                       |
-| `npm run db:seed`     | Insert or update the peaks (safe to re-run)                                    |
-| `npm run db:generate` | Regenerate the typed Prisma client (tests and typecheck do this automatically) |
-| `npm run db:studio`   | Browse the database in Prisma Studio                                           |
+| Command               | What it does                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `npm run db:migrate`  | After editing `schema.prisma`: create and apply a new migration                                      |
+| `npm run db:deploy`   | Apply existing migrations (fresh clones, CI, production)                                             |
+| `npm run db:seed`     | Insert or update the peaks (safe to re-run)                                                          |
+| `npm run db:generate` | Regenerate the typed Prisma client (`dev`, `db:seed`, `test`, and `typecheck` do this automatically) |
+| `npm run db:studio`   | Browse the database in Prisma Studio                                                                 |
 
 CI runs `npm ci`, then format check, lint, typecheck, tests, and the web build,
 in that order.
@@ -220,6 +274,14 @@ Tests sit next to the code they test (`*.test.ts(x)`):
   user-event, querying by role and label the way a user (or screen reader)
   would. They cover full flows like completing the session that summits
   Mt. Fuji, or reopening the app after a session ended while it was closed.
+- **Server tests against a real Postgres** (`summit_test`, created and
+  migrated automatically) with Supertest, including deliberate **cheating
+  attempts**: completing early, claiming extra meters, touching another
+  user's session, forged and expired tokens.
+- **Web tests with a fake server** (MSW) that exercise the real API client,
+  router, and pages, for flows like signing up, signing out, saving a
+  signed-in session, and importing guest history. Any request a test didn't
+  plan for fails the test.
 - **A browser-level check** (`check:offline`) for what jsdom can't test:
   service workers and installability.
 
@@ -232,6 +294,15 @@ Tests sit next to the code they test (`*.test.ts(x)`):
   make sure your old global bin folder is still on your `PATH`.
 - **`npm warn install-scripts` for esbuild / fsevents:** expected and safe to
   ignore. See [decision 008](docs/decisions.md#008--leave-npm-install-scripts-blocked-for-esbuild-and-fsevents).
+- **`Can't reach Postgres` when running tests:** the server tests need the
+  database. Start it with `docker compose up -d`.
+- **The server exits with "Invalid server configuration":** a required
+  setting is missing or unsafe (for example a `JWT_SECRET` under 32
+  characters). Copy `apps/server/.env.example` to `apps/server/.env`; it
+  explains each setting.
+- **"Too many attempts" when signing in:** login and sign-up allow 10 attempts
+  per 15 minutes per IP address. Wait, or restart the dev server (the counter
+  is in memory).
 - **Postgres port already in use:** set a different `POSTGRES_PORT` in `.env`
   and update the port in `DATABASE_URL` in `apps/server/.env` to match.
 - **The preview build shows an old version:** that's the service worker doing
@@ -242,7 +313,7 @@ Tests sit next to the code they test (`*.test.ts(x)`):
 
 - [x] **Phase 0:** monorepo scaffold, tooling, CI
 - [x] **Phase 1:** solo focus timer, mountain view, history, sound and notifications, PWA
-- [ ] **Phase 2:** auth, Postgres persistence, server-side elevation
+- [x] **Phase 2:** accounts, Postgres persistence, server-side elevation, guest import
 - [ ] **Phase 3:** live rope team rooms (Socket.io)
 - [ ] **Phase 4:** stats, offline sync, accessibility pass, first deploy
 - [ ] **Phase 5:** stretch goals (AWS + Terraform, browser extension, …)
