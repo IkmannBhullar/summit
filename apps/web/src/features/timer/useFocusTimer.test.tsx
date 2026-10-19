@@ -57,10 +57,24 @@ function advance(ms: number) {
   });
 }
 
-/** The first event the timer reported (typed, unlike expect.objectContaining). */
-const firstEvent = (onEvent: ReturnType<typeof setup>["onEvent"]) => onEvent.mock.calls[0]?.[0];
+type EventSpy = ReturnType<typeof setup>["onEvent"];
+
+/** The events about periods ending, in order (starts are tested separately). */
+const endEvents = (onEvent: EventSpy) =>
+  onEvent.mock.calls.map(([event]) => event).filter((event) => event.type !== "focusStarted");
+
+/** The first "end" event the timer reported (typed, unlike expect.objectContaining). */
+const firstEvent = (onEvent: EventSpy) => endEvents(onEvent)[0];
 
 describe("useFocusTimer", () => {
+  it("reports focusStarted once when a focus session starts", () => {
+    const { result, onEvent } = setup();
+
+    act(() => result.current.start());
+
+    expect(onEvent.mock.calls.map(([event]) => event.type)).toEqual(["focusStarted"]);
+  });
+
   it("shows the full focus length before starting", () => {
     const { result } = setup();
 
@@ -83,7 +97,7 @@ describe("useFocusTimer", () => {
     act(() => result.current.start());
     advance(25 * MIN);
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
     expect(firstEvent(onEvent)).toMatchObject({
       type: "focusCompleted",
       session: { status: "COMPLETED", metersGained: 250 },
@@ -100,12 +114,12 @@ describe("useFocusTimer", () => {
     advance(60 * MIN); // a long lunch
 
     expect(result.current.remainingMs).toBe(20 * MIN);
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(endEvents(onEvent)).toHaveLength(0);
 
     act(() => result.current.resume());
     advance(20 * MIN);
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
   });
 
   // The core background-tab scenario from CLAUDE.md.
@@ -121,12 +135,12 @@ describe("useFocusTimer", () => {
     });
 
     // No interval ran, so nothing has noticed the session ended yet.
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(endEvents(onEvent)).toHaveLength(0);
 
     // The user comes back.
     act(() => setVisibility("visible"));
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
     // endedAt is the scheduled end (09:25), not when we noticed (09:40).
     expect(firstEvent(onEvent)).toMatchObject({
       type: "focusCompleted",
@@ -158,7 +172,7 @@ describe("useFocusTimer", () => {
       setVisibility("hidden");
     });
 
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(endEvents(onEvent)).toHaveLength(0);
   });
 
   it("records a give-up as an abandoned session worth 0 m", () => {
@@ -199,7 +213,7 @@ describe("useFocusTimer", () => {
     act(() => result.current.start());
     advance(25 * MIN);
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
   });
 
   it("leaves no timers running after unmount", () => {
@@ -232,10 +246,10 @@ describe("useFocusTimer restoring a saved session", () => {
 
     expect(result.current.state.status).toBe("running");
     expect(result.current.remainingMs).toBe(15 * MIN);
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(endEvents(onEvent)).toHaveLength(0);
 
     advance(15 * MIN);
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
   });
 
   // Decision: a session that ran its full time while the page was closed counts.
@@ -244,7 +258,7 @@ describe("useFocusTimer restoring a saved session", () => {
 
     const { result, onEvent } = setup({ initialState: savedRunning });
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
     expect(firstEvent(onEvent)).toMatchObject({
       type: "focusCompleted",
       session: { endedAt: "2026-10-17T09:25:00.000Z", metersGained: 250 },
@@ -257,7 +271,7 @@ describe("useFocusTimer restoring a saved session", () => {
 
     const { onEvent } = setup({ initialState: savedRunning }, StrictMode);
 
-    expect(onEvent).toHaveBeenCalledTimes(1);
+    expect(endEvents(onEvent)).toHaveLength(1);
   });
 
   it("keeps a paused session paused, however long the page was closed", () => {
@@ -269,6 +283,6 @@ describe("useFocusTimer restoring a saved session", () => {
 
     expect(result.current.state.status).toBe("paused");
     expect(result.current.remainingMs).toBe(7 * MIN);
-    expect(onEvent).not.toHaveBeenCalled();
+    expect(endEvents(onEvent)).toHaveLength(0);
   });
 });

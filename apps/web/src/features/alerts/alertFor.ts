@@ -22,8 +22,9 @@ export function alertFor(event: TimerEvent): Alert | null {
       };
     case "breakCompleted":
       return { chime: "breakEnd", title: "Break's over", body: "Ready for the next climb?" };
+    case "focusStarted":
     case "focusAbandoned":
-      // The user just chose to give up; no need to tell them about it.
+      // The user just clicked Start or Give up; they don't need telling.
       return null;
   }
 }

@@ -27,6 +27,8 @@ export class ApiRequestError extends Error {
     message: string,
     /** Per-field messages for validation errors. */
     readonly fields: Record<string, string> = {},
+    /** From the Retry-After header: how long the server asks us to wait. */
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -70,7 +72,14 @@ export async function apiRequest<T = void>(
     const parsed = ApiErrorSchema.safeParse(json);
     if (parsed.success) {
       const { code, message, fields } = parsed.data.error;
-      throw new ApiRequestError(response.status, code, message, fields);
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      throw new ApiRequestError(
+        response.status,
+        code,
+        message,
+        fields,
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+      );
     }
     throw new ApiRequestError(
       response.status,

@@ -71,6 +71,8 @@ export type TimerAction =
 
 /** Things the outside world should react to after a transition. */
 export type TimerEvent =
+  /** A focus period began (signed-in users report this to the server). */
+  | { type: "focusStarted"; sessionId: string; plannedMinutes: number; startedAt: string }
   | { type: "focusCompleted"; session: FocusSession }
   | { type: "focusAbandoned"; session: FocusSession }
   | { type: "breakCompleted"; mode: "shortBreak" | "longBreak" };
@@ -124,7 +126,18 @@ export function transition(
           durationMs,
           endsAt: action.now + durationMs,
         },
-        events: [],
+        // Breaks aren't sessions, so only starting focus is reported.
+        events:
+          state.mode === "focus"
+            ? [
+                {
+                  type: "focusStarted",
+                  sessionId: action.sessionId,
+                  plannedMinutes: Math.round(durationMs / MS_PER_MINUTE),
+                  startedAt: new Date(action.now).toISOString(),
+                },
+              ]
+            : [],
       };
     }
 

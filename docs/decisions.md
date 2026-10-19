@@ -568,3 +568,40 @@ handling that MSW exercises.
 pages would keep the timer's first load lean. Moving focus to the new page's
 heading on navigation (for screen readers) belongs in Phase 4's
 accessibility pass.
+
+---
+
+## 021 — One "session store" interface: localStorage for guests, the API for accounts
+
+_2026-10-19 · Phase 2_
+
+**Decision:** The timer page talks to a `SessionStore` (sessions, climb
+progress, "load older", and an event handler). Guests get the Phase 1 store,
+backed by localStorage. Signed-in users get an account store:
+
+- The timer machine now emits **`focusStarted`** (decision 010's events are
+  still the only side-effect channel). The account store sends it as
+  `POST /api/sessions` with the timer's own UUID, then `complete` or `abandon`
+  when the period ends.
+- A completion **waits for its start request** to settle, so the server never
+  hears "finished" before "started".
+- Start and finish requests are **retried** on network failures, 5xx, and
+  `SESSION_TOO_EARLY`, waiting the server's `Retry-After`. That's safe because
+  the server de-duplicates by session id (decision 018). Other errors are
+  shown to the user and not retried.
+- After a successful finish, history and climb are **re-fetched**, so the
+  screen shows the server's numbers, not the browser's.
+- Summit celebrations wait for progress to load, so opening the app never
+  replays old summits.
+- A device hint (`summit:signed-in-hint`, only a flag) lets **guests see the
+  timer instantly**, without waiting for a server that may be slow to wake,
+  while signed-in devices show a brief "Loading your climb…" instead of a
+  flash of guest data.
+
+**Why:** The page and timer stay identical for both kinds of user; only
+where data lives changes. In Phase 4 the account store gains an offline
+queue without touching the page.
+
+**Known gap until Phase 4:** signed in and offline, the session runs, but its
+start or finish can't reach the server, and the app says so ("Couldn't save
+your session to your account…"). The offline queue will hold and sync it.

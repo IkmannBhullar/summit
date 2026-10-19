@@ -13,10 +13,20 @@ export interface HistoryListProps {
   now: Date;
   /** Date/time formatting language; defaults to the user's. */
   locale?: string;
+  /** More sessions exist than `sessions` holds (e.g. on the server). */
+  hasOlder?: boolean;
+  /** Loads the next batch of older sessions. */
+  onLoadOlder?: () => void;
 }
 
 /** Past sessions grouped by day, newest first. */
-export function HistoryList({ sessions, now, locale }: HistoryListProps) {
+export function HistoryList({
+  sessions,
+  now,
+  locale,
+  hasOlder = false,
+  onLoadOlder,
+}: HistoryListProps) {
   const [visibleCount, setVisibleCount] = useState(HISTORY_PAGE_SIZE);
 
   // Show the newest sessions first and only a page at a time. Grouping only
@@ -52,14 +62,18 @@ export function HistoryList({ sessions, now, locale }: HistoryListProps) {
             </div>
           ))}
 
-          {hiddenCount > 0 && (
+          {(hiddenCount > 0 || hasOlder) && (
             <button
               type="button"
-              onClick={() => setVisibleCount((count) => count + HISTORY_PAGE_SIZE)}
+              onClick={() => {
+                setVisibleCount((count) => count + HISTORY_PAGE_SIZE);
+                // Everything loaded is about to show: fetch older sessions too.
+                if (hiddenCount <= HISTORY_PAGE_SIZE && hasOlder) onLoadOlder?.();
+              }}
               // min-h-11 (44px): a comfortable tap target, even though it looks like a link.
               className="inline-flex min-h-11 items-center self-start text-sm font-medium text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
             >
-              Show more ({hiddenCount} older)
+              {hiddenCount > 0 ? `Show more (${hiddenCount} older)` : "Show older sessions"}
             </button>
           )}
         </div>

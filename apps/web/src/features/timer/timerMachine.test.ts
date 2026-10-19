@@ -7,6 +7,7 @@ import {
   INITIAL_TIMER_STATE,
   transition,
   type TimerAction,
+  type TimerEvent,
   type TimerState,
 } from "./timerMachine";
 
@@ -18,7 +19,7 @@ const ID = "11111111-2222-4333-8444-555555555555";
 /** Runs a sequence of actions from a starting state, collecting every event. */
 function run(actions: TimerAction[], from: TimerState = INITIAL_TIMER_STATE, s = settings) {
   let state = from;
-  const events = [];
+  const events: TimerEvent[] = [];
   for (const action of actions) {
     const result = transition(state, action, s);
     state = result.state;
@@ -26,6 +27,9 @@ function run(actions: TimerAction[], from: TimerState = INITIAL_TIMER_STATE, s =
   }
   return { state, events };
 }
+
+/** The events about periods ending (most tests care about these, not starts). */
+const endEvents = (events: TimerEvent[]) => events.filter((event) => event.type !== "focusStarted");
 
 /** Start a focus session at T0 and let it finish. */
 const focusDone = (at = T0): TimerAction[] => [
@@ -42,6 +46,32 @@ describe("durationMsFor", () => {
 });
 
 describe("starting", () => {
+  it("reports a focusStarted event with the session's id, length, and start time", () => {
+    const { events } = run([{ type: "START", now: T0, sessionId: ID }]);
+
+    expect(events).toEqual([
+      {
+        type: "focusStarted",
+        sessionId: ID,
+        plannedMinutes: 25,
+        startedAt: "2026-10-17T09:00:00.000Z",
+      },
+    ]);
+  });
+
+  // Breaks aren't sessions, so nothing to report to the server.
+  it("doesn't report starting a break", () => {
+    const afterFocus = run(focusDone()).state;
+
+    const result = transition(
+      afterFocus,
+      { type: "START", now: T0 + 26 * MIN, sessionId: ID },
+      settings,
+    );
+
+    expect(result.events).toEqual([]);
+  });
+
   it("sets endsAt = start time + duration", () => {
     const { state } = run([{ type: "START", now: T0, sessionId: ID }]);
 
@@ -75,7 +105,7 @@ describe("ticking", () => {
     const { state, events } = run(focusDone());
 
     expect(state).toEqual({ status: "idle", mode: "shortBreak", completedFocusCount: 1 });
-    expect(events).toEqual([
+    expect(endEvents(events)).toEqual([
       {
         type: "focusCompleted",
         session: {
@@ -99,7 +129,7 @@ describe("ticking", () => {
       { type: "TICK", now: T0 + 120 * MIN },
     ]);
 
-    expect(events[0]).toMatchObject({
+    expect(endEvents(events)[0]).toMatchObject({
       type: "focusCompleted",
       session: { endedAt: "2026-10-17T09:25:00.000Z" },
     });
@@ -108,7 +138,9 @@ describe("ticking", () => {
   it("produces sessions that pass the shared FocusSession schema", () => {
     const { events } = run(focusDone());
 
-    const session = events[0]?.type === "focusCompleted" ? events[0].session : undefined;
+    // One variable, so TypeScript can narrow its type with the check below.
+    const ended = endEvents(events)[0];
+    const session = ended?.type === "focusCompleted" ? ended.session : undefined;
     expect(FocusSessionSchema.safeParse(session).success).toBe(true);
   });
 });
@@ -146,7 +178,9 @@ describe("pausing and resuming", () => {
       { type: "TICK", now: T0 + 25 * MIN },
     ]);
 
-    expect(events).toMatchObject([{ type: "focusCompleted", session: { metersGained: 250 } }]);
+    expect(endEvents(events)).toMatchObject([
+      { type: "focusCompleted", session: { metersGained: 250 } },
+    ]);
   });
 
   it("never completes while paused, however much time passes", () => {
@@ -157,7 +191,7 @@ describe("pausing and resuming", () => {
     ]);
 
     expect(state.status).toBe("paused");
-    expect(events).toEqual([]);
+    expect(endEvents(events)).toEqual([]);
   });
 
   it("treats PAUSE after the time is up as completion", () => {
@@ -167,7 +201,7 @@ describe("pausing and resuming", () => {
     ]);
 
     expect(state.mode).toBe("shortBreak");
-    expect(events[0]?.type).toBe("focusCompleted");
+    expect(endEvents(events)[0]?.type).toBe("focusCompleted");
   });
 
   it("ignores PAUSE when idle and RESUME when running", () => {
@@ -187,7 +221,7 @@ describe("giving up", () => {
     ]);
 
     expect(state).toEqual({ status: "idle", mode: "focus", completedFocusCount: 0 });
-    expect(events).toMatchObject([
+    expect(endEvents(events)).toMatchObject([
       {
         type: "focusAbandoned",
         session: { status: "ABANDONED", metersGained: 0, endedAt: "2026-10-17T09:20:00.000Z" },
@@ -202,7 +236,7 @@ describe("giving up", () => {
       { type: "GIVE_UP", now: T0 + 6 * MIN },
     ]);
 
-    expect(events[0]?.type).toBe("focusAbandoned");
+    expect(endEvents(events)[0]?.type).toBe("focusAbandoned");
   });
 
   // Fairness: if the time already ran out, the session was earned.
@@ -212,7 +246,7 @@ describe("giving up", () => {
       { type: "GIVE_UP", now: T0 + 26 * MIN },
     ]);
 
-    expect(events[0]?.type).toBe("focusCompleted");
+    expect(endEvents(events)[0]?.type).toBe("focusCompleted");
   });
 
   it("doesn't count abandoned sessions toward the long break", () => {
@@ -242,7 +276,10 @@ describe("the focus / break cycle", () => {
     ]);
 
     expect(state).toEqual({ status: "idle", mode: "focus", completedFocusCount: 1 });
-    expect(events.map((event) => event.type)).toEqual(["focusCompleted", "breakCompleted"]);
+    expect(endEvents(events).map((event) => event.type)).toEqual([
+      "focusCompleted",
+      "breakCompleted",
+    ]);
   });
 
   it("gives a long break after every 4th focus session", () => {
@@ -283,7 +320,7 @@ describe("the focus / break cycle", () => {
     const { state, events } = run([...focusDone(), { type: "SKIP_BREAK", now: T0 + 26 * MIN }]);
 
     expect(state).toMatchObject({ status: "idle", mode: "focus" });
-    expect(events.map((event) => event.type)).toEqual(["focusCompleted"]);
+    expect(endEvents(events).map((event) => event.type)).toEqual(["focusCompleted"]);
   });
 
   it("ignores SKIP_BREAK during focus", () => {

@@ -105,7 +105,10 @@ describe("TimerScreen", () => {
       expect(clock()).toHaveTextContent("25:00");
       expect(button("Start focus")).toBeInTheDocument();
       expect(screen.getByText(/you slid back down/i)).toBeInTheDocument();
-      expect(onEvent.mock.calls[0]?.[0].type).toBe("focusAbandoned");
+      expect(onEvent.mock.calls.map(([event]) => event.type)).toEqual([
+        "focusStarted",
+        "focusAbandoned",
+      ]);
     });
   });
 

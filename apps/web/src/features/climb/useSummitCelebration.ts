@@ -20,10 +20,14 @@ export interface SummitCelebration {
  * This is derived during render instead of detected in an effect, so there
  * is no "compare old and new progress, then set state" step to get wrong.
  */
-export function useSummitCelebration(progress: ClimbProgress): SummitCelebration {
-  const summitedClimbs = progress.climbs.filter((climb) => climb.summitedAt !== null);
-  // The initial value is only used on the first render.
-  const [seenCount, setSeenCount] = useState(summitedClimbs.length);
+export function useSummitCelebration(progress: ClimbProgress | undefined): SummitCelebration {
+  const summitedClimbs = progress?.climbs.filter((climb) => climb.summitedAt !== null) ?? [];
+  // How many summits have been seen. Null until progress first arrives (it
+  // may load from the server): existing summits are then counted as seen,
+  // so opening the app never replays old celebrations.
+  const [seen, setSeen] = useState<number | null>(progress ? summitedClimbs.length : null);
+  if (progress && seen === null) setSeen(summitedClimbs.length);
+  const seenCount = seen ?? summitedClimbs.length;
 
   // The oldest summit not celebrated yet (several in a row show one by one).
   const unseen = summitedClimbs[seenCount];
@@ -34,6 +38,6 @@ export function useSummitCelebration(progress: ClimbProgress): SummitCelebration
   return {
     summitedPeak,
     nextPeak,
-    dismiss: () => setSeenCount((count) => count + 1),
+    dismiss: () => setSeen((count) => (count ?? 0) + 1),
   };
 }

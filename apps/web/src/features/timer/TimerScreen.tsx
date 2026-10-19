@@ -32,7 +32,7 @@ export function TimerScreen({
         setMessage(`Session complete: +${event.session.metersGained} m`);
       } else if (event.type === "focusAbandoned") {
         setMessage("You slid back down. That session's elevation didn't count.");
-      } else {
+      } else if (event.type === "breakCompleted") {
         setMessage("Break's over. Ready to climb?");
       }
       onEvent?.(event);
