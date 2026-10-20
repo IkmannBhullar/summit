@@ -610,3 +610,37 @@ queue without touching the page.
 **Known gap until Phase 4:** signed in and offline, the session runs, but its
 start or finish can't reach the server, and the app says so ("Couldn't save
 your session to your account…"). The offline queue will hold and sync it.
+
+---
+
+## 022 — The rope-team protocol: full snapshots, acknowledgements, and clock sync
+
+_2026-10-19 · Phase 3_
+
+**Decision:** The real-time protocol lives in `packages/shared/src/rooms/`:
+
+- **Typed Socket.io events** (`ClientToServerEvents`, `ServerToClientEvents`),
+  so an event-name typo is a compile error on both sides. Payloads are still
+  validated with Zod on the server, because they come from browsers.
+- **Requests use acknowledgements:** every client request (join, leave,
+  start, give up) gets a callback with `{ ok: true, data }` or
+  `{ ok: false, error: { code, message } }`, like an HTTP response.
+- **The server sends a full `RoomState` snapshot after every change**, not
+  small "diff" events.
+- **Clock sync** by NTP-style pings: `offset = serverTime − (t0 + t1) / 2`,
+  trusting the sample with the shortest round trip (its error is at most half
+  that round trip). Clients show `endsAt − (Date.now() + offset)`.
+- **Room codes:** 6 characters from an alphabet without look-alikes
+  (no 0/O, 1/I/L). Input is normalized, so dashes, spaces, lowercase, and
+  pasted invite links all work.
+
+**Why snapshots?** With diffs, one missed event (a reconnect at the wrong
+moment) leaves a client silently wrong until something resyncs it. A
+snapshot makes every message self-sufficient. Rooms hold at most 8 people,
+so a snapshot is a few hundred bytes.
+
+**Alternatives considered:** _Diff events:_ less data, more failure modes.
+_Plain WebSockets without Socket.io:_ no dependency, but reconnection, rooms
+and broadcasting, acknowledgements, and fallbacks would all be hand-written.
+_Trusting device clocks:_ teammates' countdowns would disagree by however far
+apart their clocks are, often seconds.

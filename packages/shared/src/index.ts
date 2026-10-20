@@ -31,3 +31,6 @@ export {
 
 // The API contract (request/response schemas for /api/...).
 export * from "./api";
+
+// Rope team rooms (Phase 3).
+export * from "./rooms";
