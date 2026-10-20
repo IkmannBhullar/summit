@@ -29,6 +29,8 @@ model User {
   displayName  String         @map("display_name")
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   sessions     FocusSession[]
+  /// Rope team rooms this user currently hosts (or hosted).
+  hostedRooms  Room[]
 
   @@map("users")
 }
@@ -73,8 +75,11 @@ model FocusSession {
   tag            String?
   /// Calculated by the server from status and plannedMinutes.
   metersGained   Int           @default(0) @map("meters_gained")
-  /// Set for rope team sessions (Phase 3 adds the Room table and a foreign key).
+  /// Set for rope team sessions; null for solo sessions.
   roomId         String?       @map("room_id") @db.Uuid
+  /// SetNull: deleting a room keeps everyone's sessions (they're personal
+  /// history and still count toward each climb); they just lose the link.
+  room           Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
   /// True for history imported from a guest's browser (it couldn't be checked live).
   imported       Boolean       @default(false)
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -83,4 +88,24 @@ model FocusSession {
   /// Postgres jump straight to "this user's sessions older than X".
   @@index([userId, startedAt(sort: Desc), id])
   @@map("focus_sessions")
+}
+
+/// A rope team room. Who's connected and the running session live in server
+/// memory (see docs/decisions.md); this row is the room's lasting record.
+model Room {
+  id        String         @id @default(uuid()) @db.Uuid
+  /// 6 characters from the shared ROOM_CODE_ALPHABET. Unique among OPEN
+  /// rooms only (a hand-written partial index), so codes can be reused once
+  /// a room closes.
+  code      String
+  /// The current host. Starts as the creator; changes if the host leaves.
+  hostId    String         @map("host_id") @db.Uuid
+  /// Deleting the host's account deletes rooms they host.
+  host      User           @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Set when the last member leaves; a closed room can't be joined.
+  closedAt  DateTime?      @map("closed_at") @db.Timestamptz(3)
+  sessions  FocusSession[]
+
+  @@map("rooms")
 }

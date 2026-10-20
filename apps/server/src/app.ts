@@ -5,8 +5,10 @@ import { createAuthMiddleware } from "./middleware/auth";
 import { installErrorHandling } from "./middleware/errors";
 import { installRequestParsing } from "./middleware/parsing";
 import { createAuthRouter, DEFAULT_AUTH_RATE_LIMIT, type RateLimitSettings } from "./routes/auth";
+import { createRoomsRouter, DEFAULT_ROOM_CREATE_LIMIT } from "./routes/rooms";
 import { createClimbRouter, createSessionsRouter } from "./routes/sessions";
 import { createPasswordService } from "./services/passwords";
+import { createRoomService } from "./services/rooms";
 import { createSessionService } from "./services/sessions";
 import { createTokenService } from "./services/tokens";
 
@@ -17,6 +19,8 @@ export interface AppDependencies {
   prisma: PrismaClient;
   /** Login/register attempt limits. Tests raise or lower them as needed. */
   authRateLimit?: RateLimitSettings;
+  /** Room-creation limits (per user). Tests raise or lower them as needed. */
+  roomCreateLimit?: RateLimitSettings;
   /** The clock. Tests pass a controllable one to make "25 minutes later" instant. */
   now?: () => Date;
 }
@@ -50,6 +54,7 @@ export function createApp(deps: AppDependencies): Express {
   const tokens = createTokenService(config.jwtSecret);
   const { authenticate, requireAuth } = createAuthMiddleware(tokens);
   const sessions = createSessionService(prisma, deps.now);
+  const rooms = createRoomService(prisma, { now: deps.now });
 
   // Order matters: parse requests, identify the user, then routes, then errors.
   installRequestParsing(app);
@@ -75,6 +80,14 @@ export function createApp(deps: AppDependencies): Express {
 
   app.use("/api/sessions", createSessionsRouter({ sessions, requireAuth }));
   app.use("/api/climb", createClimbRouter({ sessions, requireAuth }));
+  app.use(
+    "/api/rooms",
+    createRoomsRouter({
+      rooms,
+      requireAuth,
+      rateLimit: deps.roomCreateLimit ?? DEFAULT_ROOM_CREATE_LIMIT,
+    }),
+  );
 
   installErrorHandling(app);
   return app;

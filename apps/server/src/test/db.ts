@@ -14,5 +14,5 @@ export function createTestPrisma(): PrismaClient {
 
 /** Empties the tables tests write to. CASCADE also clears rows that reference users. */
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE "focus_sessions", "users" CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "focus_sessions", "rooms", "users" CASCADE');
 }

@@ -644,3 +644,37 @@ _Plain WebSockets without Socket.io:_ no dependency, but reconnection, rooms
 and broadcasting, acknowledgements, and fallbacks would all be hand-written.
 _Trusting device clocks:_ teammates' countdowns would disagree by however far
 apart their clocks are, often seconds.
+
+## 023 — Rooms in the database: reusable codes, and REST to create
+
+_2026-10-19 · Phase 3_
+
+**Decision:** A `rooms` table holds each room's lasting record (code, current
+host, created and closed times). Live state (who's connected, the running
+session) stays in server memory.
+
+- **Codes are unique among OPEN rooms only**, enforced by a hand-written
+  partial unique index (`WHERE closed_at IS NULL`). A closed room's code can
+  be reused. On a collision the service just tries another random code (up
+  to 5 times) instead of checking first, because "check, then insert" has a
+  race between two requests.
+- **Codes come from `crypto.randomInt`**, so they can't be predicted.
+  Randomness and the clock are injected so tests can force collisions and
+  fix times.
+- **CHECK constraints** repeat the shared code format and require
+  `closed_at >= created_at`. Both times come from the service's clock, not
+  one from Postgres and one from Node. (The CHECK caught exactly that mix-up
+  in a test.)
+- **Foreign keys:** deleting a room sets `focus_sessions.room_id` to NULL
+  (members' sessions are their own history and still count toward their
+  climbs). Deleting a user deletes the rooms they host.
+- **REST to create and look up** (`POST /api/rooms`, `GET /api/rooms/:code`),
+  signed in only, with creation limited to 20 per user per hour (per user,
+  not per IP, so friends on one home network don't share an allowance).
+  Joining and everything live happen over the socket.
+
+**Alternatives considered:** _Codes unique forever:_ uses up the code space
+and makes old codes meaningless. _Rooms only in memory:_ simpler, but team
+sessions couldn't point at the room they happened in. _Creating rooms over
+the socket:_ possible, but a plain request is easier to rate-limit, test,
+and retry, and the invite link needs a code before anyone connects.
