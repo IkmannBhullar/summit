@@ -29,6 +29,10 @@ export const RoomErrorCodeSchema = z.enum([
   "NOT_HOST",
   /** Not possible while a team session is running. */
   "SESSION_IN_PROGRESS",
+  /** There's no running team session that you're part of (e.g. to give up). */
+  "NO_SESSION",
+  /** You're connected to a different room (one room at a time). */
+  "ALREADY_IN_ROOM",
   /** The payload failed validation. */
   "INVALID_REQUEST",
 ]);

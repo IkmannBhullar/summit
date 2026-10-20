@@ -678,3 +678,35 @@ and makes old codes meaningless. _Rooms only in memory:_ simpler, but team
 sessions couldn't point at the room they happened in. _Creating rooms over
 the socket:_ possible, but a plain request is easier to rate-limit, test,
 and retry, and the invite link needs a code before anyone connects.
+
+## 024 — The room manager: a plain class with injected time, and derived status
+
+_2026-10-19 · Phase 3_
+
+**Decision:** All live room rules live in `RoomManager`
+(`apps/server/src/services/roomManager.ts`), a plain class with no Socket.io
+or database. The socket layer calls its methods and reacts to the events it
+emits (`state`, `session_ended`, `host_changed`, `closed`).
+
+- **Time is injected** (a clock and a scheduler). Tests use a `ManualClock`
+  that only moves on `advance()`, so a full countdown, 25-minute focus,
+  grace period, and break run instantly with exact timestamps. Each phase
+  has one timer, at its end; nothing ticks.
+- **Status is derived, not stored:** disconnected (no open tabs), focusing
+  or on break (only if they're a participant), otherwise idle. A stored
+  status could drift out of sync with the facts.
+- **Rules chosen:**
+  - A session includes everyone connected when the host presses Start.
+  - People who join mid-session are spectators: shown as idle, can't slip it.
+  - Leaving or giving up during the 3-second countdown slips the team too,
+    and the session's end is clamped to its start time.
+  - Every disconnect (idle or not) gets the 15-second grace period. Another
+    open tab keeps a member connected.
+  - One room per user; a stale, disconnected membership is left automatically.
+  - The next host is the longest-standing connected member.
+
+**Alternatives considered:** _Vitest fake timers (`vi.useFakeTimers`):_ less
+code, but the class would secretly depend on global time. Injecting makes
+the dependency visible, and Step 4's real-socket tests use the real clock.
+_Rules inside socket handlers:_ every test would need real connections.
+_Rejecting mid-session joins:_ simpler, but late friends couldn't watch.
