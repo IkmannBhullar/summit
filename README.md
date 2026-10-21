@@ -5,12 +5,13 @@
 **A focus timer where every focus minute climbs a real mountain.** Finish a
 25-minute session and your climber gains 250 m on Mt. Fuji; give up early and
 you slide back down. Sign in and your climb is saved to your account, with
-the server checking every meter. Coming next: friends rope up in live rooms
-and climb together, and if anyone quits early, the whole team slips.
+the server checking every meter. Or rope up with friends in a live room and
+climb together: everyone starts at the same moment, and if anyone quits
+early, the whole team slips.
 
-> **Status:** Phase 2 complete. Accounts, a Postgres backend, and
-> server-verified elevation, on top of the installable, offline-capable solo
-> timer from Phase 1. See [the roadmap](#roadmap).
+> **Status:** Phase 3 complete. Live rope team rooms over Socket.io, on top of
+> accounts and server-verified elevation (Phase 2) and the installable,
+> offline-capable solo timer (Phase 1). See [the roadmap](#roadmap).
 
 ## Features
 
@@ -44,11 +45,19 @@ and climb together, and if anyone quits early, the whole team slips.
   the sessions you did on this device as a guest.
 - **Guests stay first-class:** no account needed, and the guest timer appears
   instantly, even when the server is asleep or unreachable.
+- **Rope team rooms** (Phase 3): start a room and send the link, or join with a
+  6-character code (`K7Q-M2X`, typed any way you like). Up to 8 climbers see
+  each other live on one mountain, roped together.
+  - The host starts a session for everyone, with a 3-second countdown so all
+    clocks begin together.
+  - **If anyone gives up or leaves, the whole team slips:** nobody gets the
+    meters. Complete it together and everyone climbs, on their own peak.
+  - A dropped connection (Wi-Fi blip, closed laptop lid) has 15 seconds to
+    come back before the team slips. Friends who arrive mid-session watch
+    and join the next one.
 
 ### Planned
 
-- **Rope team rooms** (Phase 3): join friends with a 6-character code for a
-  server-synced session. If anyone leaves early, the team slips.
 - **Stats** (Phase 4): streaks, a calendar heatmap, focus by hour, and tags like
   "LeetCode" or "AWS".
 
@@ -65,6 +74,21 @@ and climb together, and if anyone quits early, the whole team slips.
   `Retry-After`), and calculates the meters. Pauses need no tracking: they only
   make a session longer.
   ([decision 018](docs/decisions.md#018--the-server-decides-elevation-clients-only-report-what-happened))
+- **The server owns the team clock.** It sets `startsAt` and `endsAt` for a
+  rope team session and decides when it completes. Each browser measures its
+  clock offset NTP-style (five pings, trusting the fastest round trip), so
+  everyone's countdown shows the same moment even when device clocks
+  disagree by seconds.
+  ([decision 022](docs/decisions.md#022--the-rope-team-protocol-full-snapshots-acknowledgements-and-clock-sync))
+- **Room rules in one plain class.** Joining, the countdown, slipping,
+  reconnect grace, and host hand-over live in `RoomManager`, with no sockets
+  and no database. Time is injected, so tests run a whole 25-minute session
+  in milliseconds, and member status is derived from the facts instead of
+  stored. ([decision 024](docs/decisions.md#024--the-room-manager-a-plain-class-with-injected-time-and-derived-status))
+- **Secure live connections.** Sockets sign in with the same `HttpOnly`
+  cookie as the API, browsers from any other origin are refused (WebSockets
+  aren't covered by CORS), and every event payload is validated.
+  ([decision 025](docs/decisions.md#025--the-socketio-layer-cookie-sign-in-an-origin-check-and-background-saves))
 - **Rules as pure, shared code.** The timer is a pure state machine, and
   elevation and summits come from pure functions in `packages/shared`, which
   the browser and the server both run. One API contract (Zod schemas) is
@@ -89,15 +113,15 @@ and climb together, and if anyone quits early, the whole team slips.
 
 ## Tech stack
 
-| Area     | Tools                                                                                                            |
-| -------- | ---------------------------------------------------------------------------------------------------------------- |
-| Web      | React 19, TypeScript, Vite, Tailwind CSS v4, Motion, React Router, TanStack Query, vite-plugin-pwa               |
-| Server   | Node 24, Express 5, TypeScript, Prisma 7, bcryptjs, jose (JWT), express-rate-limit                               |
-| Shared   | `@summit/shared`: game rules, peaks, and the Zod API contract used by both sides                                 |
-| Database | PostgreSQL 17 (Docker Compose locally), migrations with Prisma                                                   |
-| Quality  | Vitest, React Testing Library, user-event, MSW, Supertest against a real Postgres, ESLint (type-aware), Prettier |
-| CI       | GitHub Actions with a Postgres service: format, lint, typecheck, test, build                                     |
-| Planned  | Socket.io (Phase 3), Vercel + Render (Phase 4), then AWS with Terraform                                          |
+| Area     | Tools                                                                                                                |
+| -------- | -------------------------------------------------------------------------------------------------------------------- |
+| Web      | React 19, TypeScript, Vite, Tailwind CSS v4, Motion, React Router, TanStack Query, socket.io-client, vite-plugin-pwa |
+| Server   | Node 24, Express 5, TypeScript, Socket.io, Prisma 7, bcryptjs, jose (JWT), express-rate-limit                        |
+| Shared   | `@summit/shared`: game rules, peaks, and the Zod API contract used by both sides                                     |
+| Database | PostgreSQL 17 (Docker Compose locally), migrations with Prisma                                                       |
+| Quality  | Vitest, React Testing Library, user-event, MSW, Supertest against a real Postgres, ESLint (type-aware), Prettier     |
+| CI       | GitHub Actions with a Postgres service: format, lint, typecheck, test, build                                         |
+| Planned  | Vercel + Render (Phase 4), then AWS with Terraform                                                                   |
 
 ## Repository layout
 
@@ -108,19 +132,20 @@ summit/
 │   │   ├── public/             # App icons (generated from icon.svg)
 │   │   ├── scripts/            # check-offline.mjs (headless Chrome PWA check)
 │   │   └── src/
-│   │       ├── components/     # Shared UI: Modal, ConfirmDialog, TextField
-│   │       ├── features/       # timer, climb, history, settings, alerts, pwa, auth, sync
-│   │       ├── pages/          # Timer page and the centered page layout
+│   │       ├── components/     # Shared UI: Modal, ConfirmDialog, TextField, Buttons
+│   │       ├── features/       # timer, climb, history, settings, alerts, pwa, auth, sync, rooms
+│   │       ├── pages/          # Timer page, centered layout, lazy-loaded room pages
 │   │       └── lib/            # API client, query client, storage, dates
 │   └── server/                 # Express API
 │       ├── prisma/             # schema.prisma, migrations, peaks seed
 │       └── src/
-│           ├── routes/         # auth, sessions, climb
-│           ├── services/       # passwords, tokens, sessions, import rules
+│           ├── routes/         # auth, sessions, climb, rooms
+│           ├── services/       # passwords, tokens, sessions, import rules, rooms, roomManager
+│           ├── sockets/        # Socket.io: sign-in, events, saving team sessions
 │           ├── middleware/     # parsing, auth, errors
 │           └── config/         # validated environment
 ├── packages/
-│   └── shared/                 # Peaks, climb progression, schemas, API contract
+│   └── shared/                 # Peaks, climb progression, schemas, API and room contracts
 ├── docs/decisions.md           # Architecture decision log
 ├── .github/workflows/          # CI pipeline
 └── docker-compose.yml          # Local Postgres
@@ -180,9 +205,14 @@ npm run dev -w apps/server   # API at http://localhost:4000 (try /health)
 npm run dev -w apps/web      # App at http://localhost:5173
 ```
 
-The web dev server forwards `/api/...` to the API (see `vite.config.ts`), so
-the browser talks to one origin and no CORS setup is needed. As a guest you
+The web dev server forwards `/api/...` and the live connection
+(`/socket.io`, including WebSocket upgrades) to the API (see
+`vite.config.ts`), so the browser talks to one origin and no CORS setup is
+needed. As a guest you
 can use the timer with only the web app running; signing in needs the API.
+
+To try a rope team on one computer, sign in as two different users: one in a
+normal window and one in a private window (each keeps its own login cookie).
 
 ### Install it as an app
 
@@ -222,8 +252,25 @@ Every request and response is defined by a Zod schema in
 | `GET /api/sessions?limit&cursor`  | History, newest first, cursor-paginated                                           |
 | `POST /api/sessions/import`       | Import guest history (up to 1,000, with plausibility rules)                       |
 | `GET /api/climb`                  | Climb progress, derived from completed sessions                                   |
+| `POST /api/rooms`                 | Create a rope team room you host (rate-limited per user)                          |
+| `GET /api/rooms/:code`            | Is this an open room? (`404` if not)                                              |
 
-All session and climb routes require sign-in.
+All session, climb, and room routes require sign-in.
+
+### Live events (Socket.io)
+
+Typed in `packages/shared/src/rooms/events.ts`. Every request gets an
+acknowledgement, `{ ok: true, data }` or `{ ok: false, error: { code, message } }`,
+and after any change the server sends every member the room's full snapshot.
+
+| Event (browser → server) | What it does                                                        |
+| ------------------------ | ------------------------------------------------------------------- |
+| `room:join`              | Join by code (also how a dropped connection rejoins)                |
+| `room:leave`             | Leave on purpose (mid-session, the team slips)                      |
+| `session:start`          | Host only: start a team session after a 3-second countdown          |
+| `session:give_up`        | Give up: the session ends `ABANDONED` for everyone                  |
+| `clock:ping`             | Clock sync: the server answers with its time                        |
+| **`room:state`** (← in)  | The full room snapshot: members, phase and timestamps, last outcome |
 
 ## Scripts
 
@@ -282,6 +329,15 @@ Tests sit next to the code they test (`*.test.ts(x)`):
   router, and pages, for flows like signing up, signing out, saving a
   signed-in session, and importing guest history. Any request a test didn't
   plan for fails the test.
+- **Room rules on a fake clock:** `RoomManager` tests advance a
+  `ManualClock` through countdowns, 25-minute sessions, grace periods, and
+  breaks instantly, with exact timestamps.
+- **Real sockets against a real server:** socket.io-client connections with
+  real login cookies cover joining, a full team session saved for everyone,
+  an early quit, reconnecting in time (and not), the host leaving, and
+  refusing connections without a cookie or from another website.
+- **Room pages with a fake connection** that plays the server, so tests decide
+  every reply and push snapshots by hand.
 - **A browser-level check** (`check:offline`) for what jsdom can't test:
   service workers and installability.
 
@@ -305,6 +361,13 @@ Tests sit next to the code they test (`*.test.ts(x)`):
   is in memory).
 - **Postgres port already in use:** set a different `POSTGRES_PORT` in `.env`
   and update the port in `DATABASE_URL` in `apps/server/.env` to match.
+- **A rope team room won't connect from `vite preview` (port 4173):** the
+  server only accepts live connections from `WEB_ORIGIN`, which defaults to
+  the dev server (`http://localhost:5173`). Set
+  `WEB_ORIGIN=http://localhost:4173` in `apps/server/.env` while previewing.
+- **Restarting the API ended a team session:** expected. Live room state is
+  kept in server memory, so a restart ends running sessions without saving
+  them. See [decision 029](docs/decisions.md#029--live-rooms-run-on-one-server-instance-and-how-to-scale-them).
 - **The preview build shows an old version:** that's the service worker doing
   its job. Click **Reload** in the update banner, or in Chrome DevTools go to
   Application → Service workers → Unregister.
@@ -314,7 +377,7 @@ Tests sit next to the code they test (`*.test.ts(x)`):
 - [x] **Phase 0:** monorepo scaffold, tooling, CI
 - [x] **Phase 1:** solo focus timer, mountain view, history, sound and notifications, PWA
 - [x] **Phase 2:** accounts, Postgres persistence, server-side elevation, guest import
-- [ ] **Phase 3:** live rope team rooms (Socket.io)
+- [x] **Phase 3:** live rope team rooms (Socket.io)
 - [ ] **Phase 4:** stats, offline sync, accessibility pass, first deploy
 - [ ] **Phase 5:** stretch goals (AWS + Terraform, browser extension, …)
 

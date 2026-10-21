@@ -10,6 +10,8 @@
  *
  * Every page renders inside AppLayout (header + dialogs). The auth pages
  * also share CenteredPage, a simple centered column.
+ *
+ * The rope team pages are loaded on demand (see pages/lazyPages.tsx).
  */
 import type { RouteObject } from "react-router";
 import { AppLayout } from "./AppLayout";
@@ -17,9 +19,8 @@ import { AccountPage } from "./features/auth/AccountPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { RequireAuth } from "./features/auth/RequireAuth";
-import { RoomPage } from "./features/rooms/RoomPage";
-import { RoomsPage } from "./features/rooms/RoomsPage";
 import { CenteredPage } from "./pages/CenteredPage";
+import { LazyRoomPage, LazyRoomsPage } from "./pages/lazyPages";
 import { TimerPage } from "./pages/TimerPage";
 
 export const routes: RouteObject[] = [
@@ -30,11 +31,7 @@ export const routes: RouteObject[] = [
       {
         // A guest opening an invite link signs in first, then comes straight back.
         path: "rooms/:code",
-        element: (
-          <RequireAuth>
-            <RoomPage />
-          </RequireAuth>
-        ),
+        element: <LazyRoomPage />,
       },
       {
         element: <CenteredPage />,
@@ -51,11 +48,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: "rooms",
-            element: (
-              <RequireAuth>
-                <RoomsPage />
-              </RequireAuth>
-            ),
+            element: <LazyRoomsPage />,
           },
         ],
       },

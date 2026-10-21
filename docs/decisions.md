@@ -828,3 +828,57 @@ tallest member's peak:_ meters only count on your own current peak, so
 1,000 m on Fuji and on Rainier would look the same though one is much
 further along. _One small mountain per member:_ clear, but loses the
 "roped together" picture and takes far more space with 8 climbers.
+
+## 029 — Live rooms run on one server instance (and how to scale them)
+
+_2026-10-20 · Phase 3_
+
+**Decision:** For now, the server runs as **one instance**, and live room
+state (who's connected, the running session, timers) lives in that
+process's memory, in `RoomManager`. Only lasting records (rooms, finished
+sessions) are in Postgres.
+
+- A restart or deploy ends running team sessions without saving them.
+  Rooms show up again as people rejoin. Acceptable at this scale, and
+  documented in the README.
+
+**Scaling to several instances needs more than the Redis adapter:**
+
+1. **The Socket.io Redis adapter** (`@socket.io/redis-adapter`) relays
+   broadcasts between instances, so `io.to("room:…").emit(...)` reaches
+   members connected to any instance.
+2. **But the adapter doesn't share `RoomManager`'s state or timers.** Two
+   instances would each think they own the room, and both would run its
+   countdown. So also: route every connection for one room to the same
+   instance (for example a load balancer keyed by room code), or move the
+   room state and its deadlines into Redis with one owner per room (a lock).
+3. **Sticky sessions** if HTTP long-polling stays enabled, since its
+   requests must reach the instance that holds the connection (or allow
+   only WebSockets).
+
+**Alternatives considered:** _Room state in Postgres from day one:_
+durable, but every join and status change becomes a database write, and
+the timers still need one owner. _Redis now:_ another service to run
+locally, in CI, and in production, before there's a second instance to
+justify it.
+
+## 030 — The room pages load on demand
+
+_2026-10-20 · Phase 3_
+
+**Decision:** `/rooms` and `/rooms/:code` are loaded with `React.lazy` inside
+`RequireAuth` (`apps/web/src/pages/lazyPages.tsx`). Vite splits them, with
+socket.io-client, into their own files.
+
+- The main bundle no longer grows with the live-connection library, which
+  most visits (and every guest) never use. Room code is about 57 kB
+  (19 kB gzipped), fetched the first time someone opens a room.
+- Because the lazy pages sit inside `RequireAuth`, a guest opening an invite
+  is sent to sign in without downloading the room code first.
+- The service worker still precaches every file, so rooms open offline-fast
+  after the first visit.
+
+**Alternatives considered:** _React Router's `lazy` route option:_ also
+splits the code, but resolves before the route renders, so guests would
+download it just to be redirected. _No splitting:_ simpler, but every
+visitor pays for code only signed-in rope teams use.
