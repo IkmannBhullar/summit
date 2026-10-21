@@ -16,7 +16,15 @@ describe("loadConfig", () => {
       databaseUrl: valid.DATABASE_URL,
       jwtSecret: valid.JWT_SECRET,
       bcryptRounds: 12,
+      webOrigin: "http://localhost:5173",
     });
+  });
+
+  it("keeps only the origin of WEB_ORIGIN, and refuses something that isn't a web URL", () => {
+    expect(loadConfig({ ...valid, WEB_ORIGIN: "https://summit.example.com/app/" }).webOrigin).toBe(
+      "https://summit.example.com",
+    );
+    expect(() => loadConfig({ ...valid, WEB_ORIGIN: "summit.example.com" })).toThrow(/WEB_ORIGIN/);
   });
 
   // Env values are always strings; PORT must become a real number.

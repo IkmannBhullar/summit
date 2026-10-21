@@ -236,6 +236,11 @@ export class RoomManager {
     this.publish(room);
   }
 
+  /** The id of the room this user is in, if any. */
+  roomIdOf(userId: string): string | null {
+    return this.roomOfUser.get(userId)?.id ?? null;
+  }
+
   /** The room's current snapshot, or null if it isn't live. */
   stateOf(roomId: string): RoomState | null {
     const room = this.rooms.get(roomId);

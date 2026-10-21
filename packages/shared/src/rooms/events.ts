@@ -35,6 +35,8 @@ export const RoomErrorCodeSchema = z.enum([
   "ALREADY_IN_ROOM",
   /** The payload failed validation. */
   "INVALID_REQUEST",
+  /** Something broke on the server (e.g. the database); try again. */
+  "SERVER_ERROR",
 ]);
 export type RoomErrorCode = z.infer<typeof RoomErrorCodeSchema>;
 

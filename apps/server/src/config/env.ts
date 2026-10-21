@@ -26,6 +26,12 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string({ message: "is required" }).min(MIN_JWT_SECRET_LENGTH, {
     message: `must be at least ${MIN_JWT_SECRET_LENGTH} characters (try: openssl rand -base64 48)`,
   }),
+  // Where the web app is served from. Live connections (WebSockets) from
+  // any other website are refused. Stored as a bare origin, without a path.
+  WEB_ORIGIN: z
+    .url({ protocol: /^https?$/, message: "must be an http(s) URL like http://localhost:5173" })
+    .default("http://localhost:5173")
+    .transform((url) => new URL(url).origin),
 });
 
 /** The validated settings the rest of the server uses (camelCase, typed). */
@@ -37,6 +43,8 @@ export interface Config {
   jwtSecret: string;
   /** bcrypt cost factor. Tests use a tiny value to stay fast. */
   bcryptRounds: number;
+  /** The web app's origin, e.g. "http://localhost:5173" (scheme, host, port). */
+  webOrigin: string;
 }
 
 /**
@@ -62,5 +70,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     databaseUrl: parsed.DATABASE_URL,
     jwtSecret: parsed.JWT_SECRET,
     bcryptRounds: parsed.BCRYPT_ROUNDS,
+    webOrigin: parsed.WEB_ORIGIN,
   };
 }

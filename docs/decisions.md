@@ -710,3 +710,39 @@ code, but the class would secretly depend on global time. Injecting makes
 the dependency visible, and Step 4's real-socket tests use the real clock.
 _Rules inside socket handlers:_ every test would need real connections.
 _Rejecting mid-session joins:_ simpler, but late friends couldn't watch.
+
+## 025 — The Socket.io layer: cookie sign-in, an Origin check, and background saves
+
+_2026-10-19 · Phase 3_
+
+**Decision:** `apps/server/src/sockets/index.ts` runs Socket.io on the same
+HTTP server as Express and connects it to the `RoomManager`.
+
+- **Sign-in at the handshake:** a Socket.io middleware reads the same
+  `summit_session` cookie as the REST API, verifies the JWT, and loads the
+  user. Without it the connection is refused (`NOT_SIGNED_IN`), before any
+  event can be sent.
+- **Origin check (`WEB_ORIGIN`):** WebSockets aren't covered by CORS, so
+  another website could open a socket from a signed-in user's browser
+  ("cross-site WebSocket hijacking"). Browsers always send `Origin` on a
+  socket handshake; connections from any origin other than the web app's
+  are refused.
+- **Every payload is validated** with the shared Zod schemas. A missing
+  acknowledgement or a database failure never crashes the server: requests
+  answer `INVALID_REQUEST` or `SERVER_ERROR`.
+- **Broadcast groups:** `room:<id>` for a room's members, `user:<id>` for
+  all of one user's tabs (so leaving takes every tab out at once).
+- **Saving happens in the background,** when the manager reports a session
+  ended: one `FocusSession` per participant with `room_id` set, then each
+  member's new climb is broadcast. Pending saves are tracked, so tests can
+  wait for them and shutdown doesn't cut them off.
+- **A restart ends running team sessions without saving them** (live state
+  is in memory). Acceptable for one instance; scaling to several instances
+  (a Redis adapter) is covered with the Phase 3 docs.
+
+**Alternatives considered:** _Sending the token in the handshake `auth`
+field:_ page JavaScript would need to read the token, but it's httpOnly by
+design (entry 017). _A separate WebSocket server/port:_ more to deploy and a
+second origin for cookies. _Saving before broadcasting:_ the snapshot would
+wait on the database; broadcasting first keeps the room responsive, and
+the climb update follows a moment later.

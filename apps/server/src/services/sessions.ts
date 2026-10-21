@@ -22,11 +22,13 @@ import {
   type SessionPage,
   type StartSessionInput,
 } from "@summit/shared";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { PrismaClient } from "../db/client";
 import { Prisma, type FocusSession as SessionRow } from "../generated/prisma/client";
 import { HttpError } from "../lib/httpError";
 import { selectImportable } from "./importRules";
+import type { EndedTeamSession } from "./roomManager";
 
 /**
  * How much earlier than its planned length a completion may arrive.
@@ -93,6 +95,8 @@ export interface SessionService {
   climb: (userId: string) => Promise<ClimbProgress>;
   /** Copies a guest's browser history into their account (see importRules.ts). */
   importGuestHistory: (userId: string, sessions: readonly FocusSession[]) => Promise<ImportResult>;
+  /** Saves a finished rope team session: one row per participant, linked to the room. */
+  saveTeamSession: (ended: EndedTeamSession) => Promise<void>;
 }
 
 const notFound = () => new HttpError(404, "NOT_FOUND", "Session not found.");
@@ -300,6 +304,32 @@ export function createSessionService(
       });
 
       return { imported: count, skipped: sessions.length - count };
+    },
+
+    async saveTeamSession(ended) {
+      // Someone may have deleted their account (or the host's, deleting the
+      // room) mid-session. Save everyone who still exists, instead of letting
+      // one missing row fail the whole insert.
+      const [users, room] = await Promise.all([
+        prisma.user.findMany({ where: { id: { in: ended.participantIds } }, select: { id: true } }),
+        prisma.room.findUnique({ where: { id: ended.roomId }, select: { id: true } }),
+      ]);
+
+      // The times come from the room manager (the server's clock), so these
+      // rows pass the same checks as a solo session: no client says "done".
+      await prisma.focusSession.createMany({
+        data: users.map(({ id: userId }) => ({
+          // Each member's row gets its own id; the team session id is only live state.
+          id: randomUUID(),
+          userId,
+          plannedMinutes: ended.plannedMinutes,
+          startedAt: ended.startedAt,
+          endedAt: ended.endedAt,
+          status: ended.status,
+          metersGained: metersEarned(ended.status, ended.plannedMinutes),
+          roomId: room?.id ?? null,
+        })),
+      });
     },
   };
 }

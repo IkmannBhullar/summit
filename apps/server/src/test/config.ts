@@ -18,4 +18,5 @@ export const testConfig: Config = {
   // The minimum bcrypt allows: hashing takes ~1 ms instead of ~250 ms.
   // Fine for tests, never for real passwords (the env schema requires 10+).
   bcryptRounds: 4,
+  webOrigin: "http://localhost:5173",
 };
