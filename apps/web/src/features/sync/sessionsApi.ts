@@ -2,6 +2,7 @@
 import {
   ClimbResponseSchema,
   ImportResultSchema,
+  RecentTagsResponseSchema,
   MAX_IMPORT_SESSIONS,
   SessionPageSchema,
   SessionResponseSchema,
@@ -41,6 +42,11 @@ export async function abandonSession(id: string): Promise<FocusSession> {
 export function fetchHistoryPage(cursor: string | null, limit = 50): Promise<SessionPage> {
   const query = new URLSearchParams({ limit: String(limit), ...(cursor ? { cursor } : {}) });
   return apiRequest(`/api/sessions?${query}`, { schema: SessionPageSchema });
+}
+
+export async function fetchRecentTags(): Promise<string[]> {
+  const { tags } = await apiRequest("/api/tags/recent", { schema: RecentTagsResponseSchema });
+  return tags;
 }
 
 export async function fetchClimb(): Promise<ClimbProgress> {

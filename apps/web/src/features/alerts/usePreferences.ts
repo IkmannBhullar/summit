@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { TagSchema } from "@summit/shared";
 import { z } from "zod";
 import { loadFromStorage, saveToStorage } from "../../lib/storage";
 
@@ -14,6 +15,8 @@ export const PreferencesSchema = z.object({
    * existed valid, instead of resetting them all.
    */
   importDeclinedFor: z.array(z.string()).default([]),
+  /** The tag the last focus session used, suggested for the next one. */
+  focusTag: TagSchema.nullable().default(null),
 });
 export type Preferences = z.infer<typeof PreferencesSchema>;
 
@@ -21,6 +24,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   soundEnabled: true,
   notificationPromptDismissed: false,
   importDeclinedFor: [],
+  focusTag: null,
 };
 
 const STORAGE_KEY = "preferences";

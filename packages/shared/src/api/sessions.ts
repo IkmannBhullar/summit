@@ -10,6 +10,7 @@ import { z } from "zod";
 import { ClimbProgressSchema } from "../climb";
 import { FocusSessionSchema } from "../session";
 import { TIMER_SETTING_LIMITS } from "../settings";
+import { TagSchema } from "../tags";
 
 /** How many sessions one history page can return, at most. */
 export const MAX_PAGE_SIZE = 100;
@@ -31,9 +32,13 @@ export const StartSessionInputSchema = z.object({
     .int()
     .min(TIMER_SETTING_LIMITS.focusMinutes.min)
     .max(TIMER_SETTING_LIMITS.focusMinutes.max),
-  tag: z.string().trim().min(1).max(32).nullable().default(null),
+  tag: TagSchema.nullable().default(null),
 });
 export type StartSessionInput = z.infer<typeof StartSessionInputSchema>;
+
+/** GET /api/tags/recent: the signed-in user's most recently used tags, newest first. */
+export const RecentTagsResponseSchema = z.object({ tags: z.array(TagSchema) });
+export type RecentTagsResponse = z.infer<typeof RecentTagsResponseSchema>;
 
 /** Responses that return one session (start, complete, abandon). */
 export const SessionResponseSchema = z.object({ session: FocusSessionSchema });

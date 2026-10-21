@@ -1,7 +1,8 @@
-import { DEFAULT_TIMER_SETTINGS, type TimerSettings } from "@summit/shared";
+import { DEFAULT_TIMER_SETTINGS, resolveTag, type TimerSettings } from "@summit/shared";
 import { useCallback, useEffect, useState } from "react";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { TagPicker } from "../tags/TagPicker";
 import { formatClock } from "./formatClock";
 import { MODE_LABELS } from "./modeLabels";
 import type { TimerEvent } from "./timerMachine";
@@ -14,6 +15,12 @@ export interface TimerScreenProps {
   onEvent?: (event: TimerEvent) => void;
   /** Focus sessions completed today, shown under the clock. */
   completedToday?: number;
+  /** Recently used tags, offered in the tag picker. */
+  recentTags?: readonly string[];
+  /** The tag to suggest for the next focus session (the last one used). */
+  tag?: string | null;
+  /** Called with the tag each focus session starts with, to remember it. */
+  onTagChange?: (tag: string | null) => void;
 }
 
 /** The main timer: countdown, controls, and the give-up confirmation. */
@@ -21,10 +28,16 @@ export function TimerScreen({
   settings = DEFAULT_TIMER_SETTINGS,
   onEvent,
   completedToday = 0,
+  recentTags = [],
+  tag = null,
+  onTagChange,
 }: TimerScreenProps) {
   // A short message about what just happened, announced to screen readers.
   const [message, setMessage] = useState<string | null>(null);
   const [confirmingGiveUp, setConfirmingGiveUp] = useState(false);
+  // The tag field's text. Starts with the last tag, since people often do
+  // several sessions on the same thing in a row.
+  const [tagInput, setTagInput] = useState(tag ?? "");
 
   // Turn timer events into a friendly message, then pass them on.
   const handleEvent = useCallback(
@@ -70,7 +83,15 @@ export function TimerScreen({
   // Starting a new period clears the old message.
   const start = () => {
     setMessage(null);
-    timer.start();
+    if (!isFocus) {
+      timer.start();
+      return;
+    }
+    // Tidy the tag, reusing an existing spelling ("leetcode" → "LeetCode").
+    const chosen = resolveTag(tagInput, recentTags);
+    setTagInput(chosen ?? "");
+    onTagChange?.(chosen);
+    timer.start(chosen);
   };
 
   const confirmGiveUp = () => {
@@ -146,6 +167,16 @@ export function TimerScreen({
         )}
         {!isFocus && <SecondaryButton onClick={timer.skipBreak}>Skip break</SecondaryButton>}
       </div>
+
+      {/* Below the buttons, so on small phones Start still fits without scrolling. */}
+      {isFocus && state.status === "idle" && (
+        <TagPicker value={tagInput} onChange={setTagInput} recent={recentTags} />
+      )}
+      {state.status !== "idle" && state.tag && (
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Tagged <span className="font-medium text-slate-900 dark:text-slate-100">{state.tag}</span>
+        </p>
+      )}
 
       {/* A polite live region: screen readers announce new messages when idle. */}
       <p aria-live="polite" className="min-h-6 text-center font-medium">

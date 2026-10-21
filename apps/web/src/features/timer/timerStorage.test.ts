@@ -15,6 +15,7 @@ const running: TimerState = {
   startedAt: T0,
   durationMs: 25 * MIN,
   endsAt: T0 + 25 * MIN,
+  tag: "LeetCode",
 };
 
 afterEach(() => {
@@ -44,12 +45,27 @@ describe("timer storage", () => {
         startedAt: T0,
         durationMs: 25 * MIN,
         remainingMs: 10 * MIN,
+        tag: null,
       },
     ],
   ])("round-trips a %s timer", (_label, state) => {
     saveTimerState(state);
 
     expect(loadTimerState()).toEqual(state);
+  });
+
+  // Saved by a version from before tags existed: still restores, untagged.
+  it("loads a running timer saved without a tag", () => {
+    const { tag: _tag, ...beforeTags } = running;
+    writeRaw(beforeTags);
+
+    expect(loadTimerState()).toEqual({ ...running, tag: null });
+  });
+
+  it("refuses a saved tag that breaks the tag rules", () => {
+    writeRaw({ ...running, tag: "x".repeat(33) });
+
+    expect(loadTimerState()).toEqual(INITIAL_TIMER_STATE);
   });
 
   describe("rejects invalid or tampered data", () => {

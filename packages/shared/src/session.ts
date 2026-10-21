@@ -5,6 +5,7 @@
 import { z } from "zod";
 import { metersForFocusMinutes } from "./elevation";
 import { TIMER_SETTING_LIMITS } from "./settings";
+import { TagSchema } from "./tags";
 
 /**
  * Session lifecycle: PLANNED → RUNNING → COMPLETED | ABANDONED.
@@ -33,8 +34,8 @@ export const FocusSessionSchema = z
     /** When it finished; null while it's still planned or running. */
     endedAt: z.iso.datetime().nullable(),
     status: SessionStatusSchema,
-    /** Optional label like "LeetCode" (tags arrive in Phase 4). */
-    tag: z.string().trim().min(1).max(32).nullable(),
+    /** Optional label like "LeetCode" (see tags.ts). */
+    tag: TagSchema.nullable(),
     metersGained: z.number().int().nonnegative(),
     /** Set for rope team sessions (Phase 3); null for solo sessions. */
     roomId: z.string().nullable(),

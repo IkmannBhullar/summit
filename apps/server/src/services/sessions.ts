@@ -15,6 +15,7 @@
 import {
   metersEarned,
   progressFromSessions,
+  RECENT_TAGS_LIMIT,
   type ClimbProgress,
   type FocusSession,
   type ImportResult,
@@ -93,6 +94,8 @@ export interface SessionService {
   history: (userId: string, query: ListSessionsQuery) => Promise<SessionPage>;
   /** Climb progress, replayed from the user's completed sessions. */
   climb: (userId: string) => Promise<ClimbProgress>;
+  /** The user's most recently used distinct tags, newest first. */
+  recentTags: (userId: string, limit?: number) => Promise<string[]>;
   /** Copies a guest's browser history into their account (see importRules.ts). */
   importGuestHistory: (userId: string, sessions: readonly FocusSession[]) => Promise<ImportResult>;
   /** Saves a finished rope team session: one row per participant, linked to the room. */
@@ -244,6 +247,26 @@ export function createSessionService(
         sessions: page.map(toSessionDto),
         nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null,
       };
+    },
+
+    async recentTags(userId, limit = RECENT_TAGS_LIMIT) {
+      // DISTINCT ON keeps the FIRST row of each group. Grouped by lower(tag)
+      // (so "aws" and "AWS" are one tag) and sorted newest first inside each
+      // group, that first row is the tag's most recent use and spelling.
+      // The outer query then puts those tags in newest-first order.
+      // $queryRaw with a template string sends ${...} values as parameters,
+      // never as SQL text, so they can't inject SQL.
+      const rows = await prisma.$queryRaw<{ tag: string }[]>`
+        SELECT tag FROM (
+          SELECT DISTINCT ON (lower(tag)) tag, started_at
+          FROM focus_sessions
+          WHERE user_id = ${userId}::uuid AND tag IS NOT NULL
+          ORDER BY lower(tag), started_at DESC
+        ) AS latest_use
+        ORDER BY started_at DESC
+        LIMIT ${limit}
+      `;
+      return rows.map((row) => row.tag);
     },
 
     async climb(userId) {

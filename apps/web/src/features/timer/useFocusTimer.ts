@@ -44,7 +44,8 @@ export interface FocusTimer {
   remainingMs: number;
   /** Total length of the current period, for progress bars. */
   durationMs: number;
-  start: () => void;
+  /** Starts the current period; `tag` labels a focus session (ignored for breaks). */
+  start: (tag?: string | null) => void;
   pause: () => void;
   resume: () => void;
   giveUp: () => void;
@@ -144,7 +145,8 @@ export function useFocusTimer({
   // Stable action functions (useCallback), so components receiving them
   // don't re-render needlessly.
   const start = useCallback(
-    () => dispatch({ type: "START", now: Date.now(), sessionId: createIdRef.current() }),
+    (tag: string | null = null) =>
+      dispatch({ type: "START", now: Date.now(), sessionId: createIdRef.current(), tag }),
     [dispatch],
   );
   const pause = useCallback(() => dispatch({ type: "PAUSE", now: Date.now() }), [dispatch]);

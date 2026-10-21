@@ -157,3 +157,80 @@ describe("TimerScreen", () => {
     expect(document.title).toBe("24:30 · Focus · Summit");
   });
 });
+
+describe("TimerScreen tags", () => {
+  const field = () => screen.getByLabelText("Tag (optional)");
+  const startedEvent = (onEvent: ReturnType<typeof vi.fn>) =>
+    onEvent.mock.calls.map(([event]) => event as TimerEvent).find((e) => e.type === "focusStarted");
+
+  it("starts a focus session with the typed tag, tidied", async () => {
+    const onEvent = vi.fn();
+    const { user } = setup({ onEvent });
+
+    await user.type(field(), "  Leet   Code ");
+    await user.click(button("Start focus"));
+
+    expect(startedEvent(onEvent)).toMatchObject({ tag: "Leet Code" });
+    expect(screen.getByText("Tagged", { exact: false })).toHaveTextContent("Tagged Leet Code");
+    // The picker is for choosing before a session, not during one.
+    expect(screen.queryByLabelText("Tag (optional)")).not.toBeInTheDocument();
+  });
+
+  it("reuses the spelling of a recent tag", async () => {
+    const onEvent = vi.fn();
+    const { user } = setup({ onEvent, recentTags: ["LeetCode"] });
+
+    await user.type(field(), "leetcode");
+    await user.click(button("Start focus"));
+
+    expect(startedEvent(onEvent)).toMatchObject({ tag: "LeetCode" });
+  });
+
+  it("chooses a recent tag with one tap, and clears it with another", async () => {
+    const { user } = setup({ recentTags: ["AWS", "LeetCode"] });
+    const aws = () =>
+      within(screen.getByRole("group", { name: "Recent tags" })).getByRole("button", {
+        name: "AWS",
+      });
+
+    await user.click(aws());
+    expect(aws()).toHaveAttribute("aria-pressed", "true");
+    expect(field()).toHaveValue("AWS");
+
+    await user.click(aws());
+    expect(aws()).toHaveAttribute("aria-pressed", "false");
+    expect(field()).toHaveValue("");
+  });
+
+  it("suggests the last tag and reports the one each session starts with", async () => {
+    const onTagChange = vi.fn();
+    const { user } = setup({ tag: "AWS", onTagChange });
+    expect(field()).toHaveValue("AWS");
+
+    await user.click(button("Start focus"));
+
+    expect(onTagChange).toHaveBeenCalledWith("AWS");
+  });
+
+  it("starts untagged when the field is empty", async () => {
+    const onEvent = vi.fn();
+    const onTagChange = vi.fn();
+    const { user } = setup({ onEvent, onTagChange });
+
+    await user.click(button("Start focus"));
+
+    expect(startedEvent(onEvent)).toMatchObject({ tag: null });
+    expect(onTagChange).toHaveBeenCalledWith(null);
+    expect(screen.queryByText("Tagged", { exact: false })).not.toBeInTheDocument();
+  });
+
+  it("has no tag picker for breaks", async () => {
+    const { user } = setup();
+    await user.click(button("Start focus"));
+
+    advance(25 * MIN);
+
+    expect(button("Start break")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Tag (optional)")).not.toBeInTheDocument();
+  });
+});

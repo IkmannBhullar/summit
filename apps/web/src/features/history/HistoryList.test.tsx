@@ -35,6 +35,14 @@ describe("HistoryList", () => {
     expect(rows).toEqual(["11:00 AM · 25 min focus" + "Gave up", "9:00 AM · 25 min focus+250 m"]);
   });
 
+  it("shows each session's tag, read aloud as 'tagged'", () => {
+    renderList([makeSession("2026-10-17T09:25:00.000Z", { tag: "LeetCode" })]);
+
+    const row = screen.getByRole("listitem");
+    expect(within(row).getByText("LeetCode")).toBeInTheDocument();
+    expect(row).toHaveTextContent("25 min focus, tagged LeetCode");
+  });
+
   it("shows meters for completed sessions and 'Gave up' for abandoned ones", () => {
     renderList([
       makeSession("2026-10-17T09:25:00.000Z"),

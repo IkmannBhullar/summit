@@ -35,8 +35,10 @@ export function MountainView({ progress }: { progress: ClimbProgress }) {
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Peak {peak.order} of {PEAKS.length} · {peak.region}
         </p>
-        {/* Each phrase stays on one line; only the gap between them can wrap. */}
-        <p className="mt-1 text-slate-600 dark:text-slate-300">
+        {/* Each phrase stays on one line; only the gap between them can wrap.
+            Slightly smaller on the narrowest phones (under 380 px), so the
+            whole line fits and the Start button stays on screen. */}
+        <p className="mt-1 text-sm text-slate-600 min-[380px]:text-base dark:text-slate-300">
           <span className="whitespace-nowrap">
             {meters(metersGained)} of {meters(peak.heightMeters)}
           </span>

@@ -6,7 +6,7 @@
  * tracked with timestamps, restoring is enough: if the session ended while
  * the page was closed, the next TICK completes it at its real end time.
  */
-import { TIMER_SETTING_LIMITS } from "@summit/shared";
+import { TagSchema, TIMER_SETTING_LIMITS } from "@summit/shared";
 import { z } from "zod";
 import { loadFromStorage, saveToStorage } from "../../lib/storage";
 import { INITIAL_TIMER_STATE, type TimerState } from "./timerMachine";
@@ -27,6 +27,8 @@ const activeFields = {
   sessionId: z.uuid(),
   startedAt: timestamp,
   durationMs: z.number().int().positive().max(MAX_DURATION_MS),
+  // .default(null): a timer saved before tags existed still loads.
+  tag: TagSchema.nullable().default(null),
 };
 
 /**

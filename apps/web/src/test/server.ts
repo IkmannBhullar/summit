@@ -10,6 +10,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 export const guestHandlers = [
+  // No tags used yet. (Only asked for when signed in; tests that need tags add their own.)
+  http.get("*/api/tags/recent", () => HttpResponse.json({ tags: [] })),
   http.get("*/api/auth/me", () =>
     HttpResponse.json(
       { error: { code: "UNAUTHENTICATED", message: "Please sign in to continue." } },

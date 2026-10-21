@@ -7,6 +7,7 @@
  *   GET  /api/sessions?limit&cursor   history page, newest first  → 200
  *   POST /api/sessions/import         copy guest history in       → 200 { imported, skipped }
  *   GET  /api/climb                   climb progress              → 200
+ *   GET  /api/tags/recent             recently used tags          → 200 { tags }
  *
  * Routes stay thin: validate input, call the service, shape the response.
  */
@@ -15,6 +16,7 @@ import {
   ListSessionsQuerySchema,
   StartSessionInputSchema,
   type ClimbResponse,
+  type RecentTagsResponse,
   type ImportResult,
   type SessionPage,
   type SessionResponse,
@@ -82,6 +84,19 @@ export function createClimbRouter(deps: {
   const router = Router();
   router.get("/", deps.requireAuth, async (req, res) => {
     const body: ClimbResponse = { progress: await deps.sessions.climb(signedInUserId(req)) };
+    res.json(body);
+  });
+  return router;
+}
+
+/** GET /api/tags/recent: the tags the picker offers, most recently used first. */
+export function createTagsRouter(deps: {
+  sessions: SessionService;
+  requireAuth: RequestHandler;
+}): Router {
+  const router = Router();
+  router.get("/recent", deps.requireAuth, async (req, res) => {
+    const body: RecentTagsResponse = { tags: await deps.sessions.recentTags(signedInUserId(req)) };
     res.json(body);
   });
   return router;

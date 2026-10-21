@@ -882,3 +882,33 @@ socket.io-client, into their own files.
 splits the code, but resolves before the route renders, so guests would
 download it just to be redirected. _No splitting:_ simpler, but every
 visitor pays for code only signed-in rope teams use.
+
+## 031 — Tags: one shared rule, case-insensitive, chosen before Start
+
+_2026-10-20 · Phase 4_
+
+**Decision:** A session can carry one optional tag ("LeetCode", "AWS"),
+chosen before **Start focus** and fixed for that session.
+
+- **One rule everywhere** (`packages/shared/src/tags.ts`): trim, squeeze
+  whitespace, 1–32 characters. The API, the browser, saved timer state, and
+  a Postgres CHECK constraint (`focus_sessions_tag_tidy`) all enforce it.
+- **Case doesn't make a new tag.** "leetcode" and "LeetCode" are one tag:
+  the picker reuses the spelling you already have, and the server compares
+  with `lower(tag)`. Stats (next step) group the same way.
+- **Recent tags** for the picker: accounts get `GET /api/tags/recent`, a
+  `DISTINCT ON (lower(tag))` query over the whole history; guests get the
+  same answer from their saved sessions (shared `recentTags`).
+- **The tag lives on the running period** in the timer state, so it survives
+  pauses and reloads. Older saved timers without a tag still load
+  (`.default(null)`). The last tag is remembered for the next session.
+- **The picker sits below Start**, so the 320 px phone layout keeps Start
+  on screen. (Checking this found an older bug: the climb caption wrapped
+  once you had any progress; it's now smaller below 380 px.)
+- **Rope team sessions stay untagged** for now.
+
+**Alternatives considered:** _Case-sensitive tags:_ simpler, but "AWS" and
+"aws" would split the stats. _A tags table with ids:_ allows renaming and
+colors later, but a free-text column is enough until there's a feature
+that needs more. _Changing a tag mid-session:_ needs an update endpoint
+and a rule for what the server already recorded; not worth it yet.

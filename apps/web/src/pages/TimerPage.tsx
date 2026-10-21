@@ -101,7 +101,14 @@ function TimerPageContent({ userId }: { userId: string | null }) {
           Loading your climb…
         </p>
       )}
-      <TimerScreen settings={settings} onEvent={handleTimerEvent} completedToday={completedToday} />
+      <TimerScreen
+        settings={settings}
+        onEvent={handleTimerEvent}
+        completedToday={completedToday}
+        recentTags={store.recentTags}
+        tag={preferences.focusTag}
+        onTagChange={(focusTag) => updatePreferences({ focusTag })}
+      />
       <div className="flex w-full flex-col items-center gap-8 lg:col-span-2">
         {store.syncProblem && (
           <p

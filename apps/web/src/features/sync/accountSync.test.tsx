@@ -1,7 +1,13 @@
 // Signed-in users: sessions go to the API, and history and climb come back
 // from it. MSW plays a small stateful server that applies the same rules as
 // the real one (server clock, "too early" check, meters from metersEarned).
-import { metersEarned, progressFromSessions, type FocusSession, type User } from "@summit/shared";
+import {
+  metersEarned,
+  progressFromSessions,
+  recentTags,
+  type FocusSession,
+  type User,
+} from "@summit/shared";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -54,20 +60,25 @@ beforeEach(() => {
       record(request);
       return HttpResponse.json({ sessions: finishedFor(), nextCursor: null });
     }),
+    http.get("*/api/tags/recent", () => HttpResponse.json({ tags: recentTags(serverSessions) })),
     http.get("*/api/climb", ({ request }) => {
       record(request);
       return HttpResponse.json({ progress: progressFromSessions(serverSessions) });
     }),
     http.post("*/api/sessions", async ({ request }) => {
       record(request);
-      const body = (await request.json()) as { id: string; plannedMinutes: number };
+      const body = (await request.json()) as {
+        id: string;
+        plannedMinutes: number;
+        tag: string | null;
+      };
       const session: FocusSession = {
         id: body.id,
         plannedMinutes: body.plannedMinutes,
         startedAt: new Date(Date.now()).toISOString(), // the SERVER's clock
         endedAt: null,
         status: "RUNNING",
-        tag: null,
+        tag: body.tag,
         metersGained: 0,
         roomId: null,
       };
@@ -235,6 +246,31 @@ describe("signed in", () => {
   });
 });
 
+describe("tags", () => {
+  it("offers the account's recent tags and saves the chosen one with the session", async () => {
+    serverSessions.push(
+      makeSession("2026-10-17T09:25:00.000Z", { tag: "LeetCode" }),
+      makeSession("2026-10-17T10:25:00.000Z", { tag: "AWS" }),
+    );
+    const user = await renderSignedIn();
+
+    const recent = await screen.findByRole("group", { name: "Recent tags" });
+    expect(
+      within(recent)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["AWS", "LeetCode"]);
+    await user.click(within(recent).getByRole("button", { name: "LeetCode" }));
+    await user.click(screen.getByRole("button", { name: "Start focus" }));
+    await vi.waitFor(() => expect(serverSessions).toHaveLength(3));
+    advance(25 * MIN);
+
+    expect(serverSessions[2]?.tag).toBe("LeetCode");
+    // The seeded LeetCode session, plus the new one, once history refreshes.
+    await vi.waitFor(() => expect(within(history()).getAllByText("LeetCode")).toHaveLength(2));
+  });
+});
+
 describe("guests", () => {
   it("never touch the session API, and use this device's storage", async () => {
     signedIn = null;
@@ -249,6 +285,24 @@ describe("guests", () => {
     expect(await screen.findByText("Session complete: +250 m")).toBeInTheDocument();
     expect(requests).toEqual([]);
     expect(JSON.parse(localStorage.getItem("summit:sessions") ?? "[]")).toHaveLength(1);
+  });
+
+  it("tag their sessions on this device, and get them offered next time", async () => {
+    signedIn = null;
+    localStorage.removeItem("summit:signed-in-hint");
+    render(<App />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Tag (optional)"), "Rust");
+    await user.click(screen.getByRole("button", { name: "Start focus" }));
+    advance(25 * MIN);
+    // The break comes next (no tags there); skip it to get back to focus.
+    await user.click(await screen.findByRole("button", { name: "Skip break" }));
+
+    expect(await screen.findByRole("group", { name: "Recent tags" })).toHaveTextContent("Rust");
+    const saved = JSON.parse(localStorage.getItem("summit:sessions") ?? "[]") as { tag: string }[];
+    expect(saved[0]?.tag).toBe("Rust");
+    expect(requests).toEqual([]);
   });
 
   it("shows a short loading state for a device that had a signed-in user", async () => {

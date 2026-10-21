@@ -93,6 +93,13 @@ function HistoryItem({ session, locale }: { session: FocusSession; locale?: stri
           {" "}
           · {session.plannedMinutes} min focus
         </span>
+        {/* "sr-only" text is read aloud but not shown: "25 min focus, tagged AWS". */}
+        {session.tag && <span className="sr-only">{", tagged "}</span>}
+        {session.tag && (
+          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {session.tag}
+          </span>
+        )}
       </span>
       {completed ? (
         <span className="font-medium text-teal-700 dark:text-teal-400">

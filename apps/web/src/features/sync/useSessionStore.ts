@@ -9,7 +9,12 @@
  * Both are exposed through the same SessionStore shape, so the timer page
  * doesn't care which one it's using.
  */
-import { progressFromSessions, type ClimbProgress, type FocusSession } from "@summit/shared";
+import {
+  progressFromSessions,
+  recentTags,
+  type ClimbProgress,
+  type FocusSession,
+} from "@summit/shared";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 import { useSessionHistory, type SessionHistory } from "../history/useSessionHistory";
@@ -19,6 +24,7 @@ import {
   completeSession,
   fetchClimb,
   fetchHistoryPage,
+  fetchRecentTags,
   sessionRetryDelay,
   shouldRetrySessionRequest,
   startSession,
@@ -36,12 +42,15 @@ export interface SessionStore {
   handleTimerEvent: (event: TimerEvent) => void;
   /** A message to show when saving to the account failed for good. */
   syncProblem: string | null;
+  /** Recently used tags, newest first, for the tag picker. */
+  recentTags: string[];
 }
 
 /** Guests: history in localStorage, progress replayed in the browser. */
 function useGuestStore(guestHistory: SessionHistory): SessionStore {
   const { sessions, addSession } = guestHistory;
   const progress = useMemo(() => progressFromSessions(sessions), [sessions]);
+  const tags = useMemo(() => recentTags(sessions), [sessions]);
 
   const handleTimerEvent = useCallback(
     (event: TimerEvent) => {
@@ -60,11 +69,13 @@ function useGuestStore(guestHistory: SessionHistory): SessionStore {
     loadOlder: () => {},
     handleTimerEvent,
     syncProblem: null,
+    recentTags: tags,
   };
 }
 
 export const HISTORY_KEY = ["sessions", "history"] as const;
 export const CLIMB_KEY = ["climb"] as const;
+export const RECENT_TAGS_KEY = ["tags", "recent"] as const;
 
 /** Signed-in users: everything goes through the API. */
 function useAccountStore(enabled: boolean): SessionStore {
@@ -79,6 +90,7 @@ function useAccountStore(enabled: boolean): SessionStore {
     enabled,
   });
   const climb = useQuery({ queryKey: CLIMB_KEY, queryFn: fetchClimb, enabled });
+  const tags = useQuery({ queryKey: RECENT_TAGS_KEY, queryFn: fetchRecentTags, enabled });
 
   // Start requests still in flight, by session id. A completion waits for
   // its start, so the server never hears "finished" before "started".
@@ -101,6 +113,7 @@ function useAccountStore(enabled: boolean): SessionStore {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: HISTORY_KEY }),
         queryClient.invalidateQueries({ queryKey: CLIMB_KEY }),
+        queryClient.invalidateQueries({ queryKey: RECENT_TAGS_KEY }),
       ]),
   });
 
@@ -112,7 +125,7 @@ function useAccountStore(enabled: boolean): SessionStore {
         const request = startAsync({
           id: event.sessionId,
           plannedMinutes: event.plannedMinutes,
-          tag: null,
+          tag: event.tag,
         })
           // A failure is shown through `start.error`; here we only need
           // "settled", so the completion can go ahead (and report its own error).
@@ -142,6 +155,7 @@ function useAccountStore(enabled: boolean): SessionStore {
     syncProblem: failure
       ? `Couldn't save your session to your account: ${failure instanceof Error ? failure.message : "unknown error"}`
       : null,
+    recentTags: tags.data ?? [],
   };
 }
 

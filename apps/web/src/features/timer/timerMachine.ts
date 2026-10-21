@@ -32,6 +32,8 @@ interface ActiveFields {
   startedAt: number;
   /** Planned length, fixed at start so changing settings mid-session can't affect it. */
   durationMs: number;
+  /** The tag chosen at Start (focus only), saved with the session. */
+  tag: string | null;
 }
 
 /** Ready to start `mode`, waiting for the user. */
@@ -60,7 +62,12 @@ export type TimerState = IdleState | RunningState | PausedState;
 
 /** Things that can happen to the timer. Each carries the current time. */
 export type TimerAction =
-  | { type: "START"; now: number; sessionId: string }
+  | {
+      type: "START";
+      now: number;
+      sessionId: string;
+      /** Focus only; ignored for breaks. */ tag?: string | null;
+    }
   | { type: "PAUSE"; now: number }
   | { type: "RESUME"; now: number }
   /** "Check the clock": completes the period if its time is up. */
@@ -72,7 +79,13 @@ export type TimerAction =
 /** Things the outside world should react to after a transition. */
 export type TimerEvent =
   /** A focus period began (signed-in users report this to the server). */
-  | { type: "focusStarted"; sessionId: string; plannedMinutes: number; startedAt: string }
+  | {
+      type: "focusStarted";
+      sessionId: string;
+      plannedMinutes: number;
+      startedAt: string;
+      tag: string | null;
+    }
   | { type: "focusCompleted"; session: FocusSession }
   | { type: "focusAbandoned"; session: FocusSession }
   | { type: "breakCompleted"; mode: "shortBreak" | "longBreak" };
@@ -116,6 +129,8 @@ export function transition(
     case "START": {
       if (state.status !== "idle") return unchanged;
       const durationMs = durationMsFor(state.mode, settings);
+      // Breaks aren't saved as sessions, so they never carry a tag.
+      const tag = state.mode === "focus" ? (action.tag ?? null) : null;
       return {
         state: {
           status: "running",
@@ -125,6 +140,7 @@ export function transition(
           startedAt: action.now,
           durationMs,
           endsAt: action.now + durationMs,
+          tag,
         },
         // Breaks aren't sessions, so only starting focus is reported.
         events:
@@ -135,6 +151,7 @@ export function transition(
                   sessionId: action.sessionId,
                   plannedMinutes: Math.round(durationMs / MS_PER_MINUTE),
                   startedAt: new Date(action.now).toISOString(),
+                  tag,
                 },
               ]
             : [],
@@ -225,7 +242,7 @@ function buildSession(
     startedAt: new Date(state.startedAt).toISOString(),
     endedAt: new Date(endedAtMs).toISOString(),
     status,
-    tag: null,
+    tag: state.tag,
     metersGained: metersEarned(status, plannedMinutes),
     roomId: null,
   };

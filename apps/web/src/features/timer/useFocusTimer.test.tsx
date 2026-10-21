@@ -237,6 +237,7 @@ describe("useFocusTimer restoring a saved session", () => {
     startedAt: T0,
     durationMs: 25 * MIN,
     endsAt: T0 + 25 * MIN,
+    tag: null,
   };
 
   it("continues a session that is still in progress", () => {

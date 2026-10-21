@@ -28,6 +28,7 @@ describe("alertFor", () => {
         sessionId: "0b7c5d1e-8f4a-4c3b-9d2e-1a6f7b8c9d0e",
         plannedMinutes: 25,
         startedAt: "2026-10-17T09:00:00.000Z",
+        tag: null,
       }),
     ).toBeNull();
   });

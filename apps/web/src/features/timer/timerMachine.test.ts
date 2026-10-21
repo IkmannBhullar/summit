@@ -55,8 +55,33 @@ describe("starting", () => {
         sessionId: ID,
         plannedMinutes: 25,
         startedAt: "2026-10-17T09:00:00.000Z",
+        tag: null,
       },
     ]);
+  });
+
+  it("carries the chosen tag through the start, a pause, and into the saved session", () => {
+    const { events } = run([
+      { type: "START", now: T0, sessionId: ID, tag: "LeetCode" },
+      { type: "PAUSE", now: T0 + 5 * MIN },
+      { type: "RESUME", now: T0 + 10 * MIN },
+      { type: "TICK", now: T0 + 30 * MIN },
+    ]);
+
+    expect(events[0]).toMatchObject({ type: "focusStarted", tag: "LeetCode" });
+    expect(events[1]).toMatchObject({ type: "focusCompleted", session: { tag: "LeetCode" } });
+  });
+
+  it("never tags a break", () => {
+    const afterFocus = run(focusDone()).state;
+
+    const { state } = transition(
+      afterFocus,
+      { type: "START", now: T0 + 26 * MIN, sessionId: ID, tag: "LeetCode" },
+      settings,
+    );
+
+    expect(state).toMatchObject({ mode: "shortBreak", tag: null });
   });
 
   // Breaks aren't sessions, so nothing to report to the server.

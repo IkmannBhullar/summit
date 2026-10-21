@@ -4,6 +4,7 @@ import {
   ClimbResponseSchema,
   getCurrentClimb,
   ImportResultSchema,
+  RecentTagsResponseSchema,
   MAX_IMPORT_SESSIONS,
   type FocusSession,
   SessionPageSchema,
@@ -391,6 +392,82 @@ describe("GET /api/climb", () => {
   });
 });
 
+describe("tags", () => {
+  /** Starts (and abandons, to free the slot) a session with this tag. */
+  async function tagged(agent: Agent, tag: string) {
+    const id = randomUUID();
+    const res = await agent.post("/api/sessions").send({ id, plannedMinutes: 25, tag });
+    expect(res.status).toBe(201);
+    await agent.post(`/api/sessions/${id}/abandon`);
+    wait(MIN);
+    return sessionIn(res);
+  }
+  const recent = async (agent: Agent) =>
+    RecentTagsResponseSchema.parse((await agent.get("/api/tags/recent")).body).tags;
+
+  it("saves a session's tag, tidied", async () => {
+    const agent = await signIn();
+
+    const session = await tagged(agent, "  Leet   Code ");
+
+    expect(session.tag).toBe("Leet Code");
+  });
+
+  it("refuses a tag over 32 characters (400)", async () => {
+    const agent = await signIn();
+
+    const res = await agent
+      .post("/api/sessions")
+      .send({ id: randomUUID(), plannedMinutes: 25, tag: "x".repeat(33) });
+
+    expect(res.status).toBe(400);
+    expect(apiError(res).fields).toHaveProperty("tag");
+  });
+
+  it("lists recent tags newest first, one per tag whatever the case, in the newest spelling", async () => {
+    const agent = await signIn();
+    for (const tag of ["aws", "LeetCode", "AWS", "Rust"]) await tagged(agent, tag);
+
+    expect(await recent(agent)).toEqual(["Rust", "AWS", "LeetCode"]);
+  });
+
+  it("offers at most 8, and only the signed-in user's", async () => {
+    const ana = await signIn();
+    const ben = await signIn("ben@example.com");
+    for (let i = 1; i <= 10; i++) await tagged(ana, `topic ${i}`);
+    await tagged(ben, "Ben's secret project");
+
+    const tags = await recent(ana);
+
+    expect(tags).toHaveLength(8);
+    expect(tags[0]).toBe("topic 10");
+    expect(tags).not.toContain("Ben's secret project");
+  });
+
+  // The database refuses messy tags even if something skipped the API.
+  it.each([" AWS", "AWS ", "Leet  Code", "Leet\tCode", "x".repeat(33)])(
+    "the database refuses the untidy tag %j",
+    async (tag) => {
+      const user = await prisma.user.create({
+        data: { email: "db@example.com", passwordHash: "hash", displayName: "Db" },
+      });
+
+      await expect(
+        prisma.focusSession.create({
+          data: {
+            id: randomUUID(),
+            userId: user.id,
+            plannedMinutes: 25,
+            startedAt: new Date(T0),
+            status: "RUNNING",
+            tag,
+          },
+        }),
+      ).rejects.toThrow(/focus_sessions_tag_tidy/);
+    },
+  );
+});
+
 describe("authentication", () => {
   it.each([
     ["POST", "/api/sessions"],
@@ -398,6 +475,7 @@ describe("authentication", () => {
     ["POST", `/api/sessions/${randomUUID()}/abandon`],
     ["GET", "/api/sessions"],
     ["GET", "/api/climb"],
+    ["GET", "/api/tags/recent"],
     ["POST", "/api/sessions/import"],
   ])("%s %s requires sign-in (401)", async (method, path) => {
     const req = method === "GET" ? request(app).get(path) : request(app).post(path);
