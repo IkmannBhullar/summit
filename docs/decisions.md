@@ -746,3 +746,31 @@ design (entry 017). _A separate WebSocket server/port:_ more to deploy and a
 second origin for cookies. _Saving before broadcasting:_ the snapshot would
 wait on the database; broadcasting first keeps the room responsive, and
 the climb update follows a moment later.
+
+## 026 — The web's live connection: a small interface, a fake for tests
+
+_2026-10-20 · Phase 3_
+
+**Decision:** The web app reaches rooms through a `RoomConnection` interface
+(`apps/web/src/features/rooms/roomConnection.ts`). The real implementation wraps
+socket.io-client; tests provide a `FakeRoomConnection` through
+`RoomConnectionContext` and play the server themselves.
+
+- **`useRoom(code)`** joins on every connect, so after a dropped connection
+  Socket.io's automatic reconnect plus a fresh join lands inside the server's
+  15-second grace period. The last snapshot stays on screen meanwhile.
+- **Snapshots are validated** with the shared `RoomStateSchema`, like REST
+  responses. An invalid one is skipped (the next one replaces it anyway).
+- **Every request has a 5-second timeout** and resolves to a result (never
+  throws), including a client-side `NO_CONNECTION` error.
+- **Clock sync** runs after each join: 5 sequential pings, keeping the
+  fastest round trip (shared `estimateClockOffset`).
+- **Closing the connection ourselves** (leaving, a failed join, unmounting)
+  is remembered, so Socket.io's resulting "disconnect" isn't shown as a problem.
+- **Dev proxy:** Vite forwards `/socket.io` with `ws: true`, so the browser
+  still talks to one origin and passes the server's `WEB_ORIGIN` check.
+
+**Alternatives considered:** _MSW's WebSocket mocking:_ it works at the
+network level, but Socket.io's own protocol on top would need an extra
+binding package and make tests hard to read. _Calling socket.io-client
+directly from components:_ every component test would need a server.

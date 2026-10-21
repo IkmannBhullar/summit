@@ -14,9 +14,16 @@ const THEME_COLOR = "#0f766e";
  * The browser then only ever talks to one origin (localhost:5173), so there
  * are no CORS rules to configure and cookies behave like in production with
  * same-site hosting. Override with API_PROXY_TARGET if the server runs elsewhere.
+ *
+ * /socket.io is the live connection for rope team rooms. `ws: true` also
+ * forwards the WebSocket "upgrade" request, not just plain HTTP. The
+ * browser's Origin header passes through unchanged, which the server checks
+ * against WEB_ORIGIN.
  */
+const proxyTarget = process.env.API_PROXY_TARGET ?? "http://localhost:4000";
 const apiProxy = {
-  "/api": { target: process.env.API_PROXY_TARGET ?? "http://localhost:4000", changeOrigin: true },
+  "/api": { target: proxyTarget, changeOrigin: true },
+  "/socket.io": { target: proxyTarget, changeOrigin: true, ws: true },
 };
 
 export default defineConfig({
@@ -64,8 +71,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,ico}"],
         // Any page URL loads the app shell, so deep links work offline too.
         navigateFallback: "index.html",
-        // ...except API URLs, which must always reach the server.
-        navigateFallbackDenylist: [/^\/api\//],
+        // ...except API and live-connection URLs, which must always reach the server.
+        navigateFallbackDenylist: [/^\/api\//, /^\/socket\.io\//],
         // Delete caches from older service worker versions.
         cleanupOutdatedCaches: true,
       },
