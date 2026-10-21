@@ -1,23 +1,11 @@
 import { getCurrentClimb, PEAKS, type ClimbProgress, type Peak } from "@summit/shared";
 import { animate, m, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { useEffect, useId } from "react";
-import {
-  MOUNTAIN_OUTLINE,
-  pointAlong,
-  SNOW_CAP,
-  SUMMIT,
-  toPathData,
-  TRAIL,
-  VIEW_BOX,
-} from "./trail";
+import { MountainBackdrop, SummitFlag } from "./MountainScenery";
+import { pointAlong, TRAIL, TRAIL_PATH, VIEW_BOX } from "./trail";
 
 /** Formats meters with thousands separators, e.g. "3,776 m". */
 const meters = (value: number) => `${value.toLocaleString("en-US")} m`;
-
-// Path data never changes, so build the strings once instead of every render.
-const OUTLINE_PATH = toPathData(MOUNTAIN_OUTLINE, true);
-const SNOW_PATH = toPathData(SNOW_CAP, true);
-const TRAIL_PATH = toPathData(TRAIL);
 
 /** How long the climber takes to walk to a new position, in seconds. */
 const CLIMB_ANIMATION_SECONDS = 1.2;
@@ -121,26 +109,8 @@ function MountainDrawing({ peakName, fraction, metersGained, heightMeters }: Mou
         {`Climber at ${meters(metersGained)} of ${meters(heightMeters)} on ${peakName}`}
       </title>
 
-      {/* Sky */}
-      <rect
-        width={VIEW_BOX.width}
-        height={VIEW_BOX.height}
-        className="fill-sky-100 dark:fill-slate-900"
-      />
-
-      {/* Mountain and snow cap */}
-      <path d={OUTLINE_PATH} className="fill-slate-400 dark:fill-slate-700" />
-      <path d={SNOW_PATH} className="fill-white dark:fill-slate-200" />
-
-      {/* The whole trail, faint and dashed... */}
-      <path
-        d={TRAIL_PATH}
-        fill="none"
-        strokeWidth={2}
-        strokeDasharray="4 5"
-        strokeLinecap="round"
-        className="stroke-slate-100/80 dark:stroke-slate-400/60"
-      />
+      {/* Sky, mountain, snow, and the whole trail, faint and dashed... */}
+      <MountainBackdrop />
       {/* ...and the part already climbed, solid on top of it. */}
       <m.path
         d={TRAIL_PATH}
@@ -154,19 +124,7 @@ function MountainDrawing({ peakName, fraction, metersGained, heightMeters }: Mou
         className="stroke-teal-600 dark:stroke-teal-400"
       />
 
-      {/* Summit flag */}
-      <line
-        x1={SUMMIT.x}
-        y1={SUMMIT.y}
-        x2={SUMMIT.x}
-        y2={SUMMIT.y - 20}
-        strokeWidth={2}
-        className="stroke-slate-700 dark:stroke-slate-300"
-      />
-      <path
-        d={`M${SUMMIT.x} ${SUMMIT.y - 20} L${SUMMIT.x + 14} ${SUMMIT.y - 15} L${SUMMIT.x} ${SUMMIT.y - 10} Z`}
-        className="fill-red-500"
-      />
+      <SummitFlag />
 
       {/* The climber */}
       <m.circle

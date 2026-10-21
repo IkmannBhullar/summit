@@ -10,6 +10,7 @@ import { roomClock } from "./roomClock";
 import { RoomMembers } from "./RoomMembers";
 import { formatRoomCode, roomInviteLink } from "./roomsApi";
 import { describeOutcome } from "./teamAlerts";
+import { TeamMountain } from "./TeamMountain";
 import { TeamTimer } from "./TeamTimer";
 import { useRoom } from "./useRoom";
 import { useTeamAlerts } from "./useTeamAlerts";
@@ -107,6 +108,8 @@ function RoomView({ code }: { code: string }) {
             {describeOutcome(room.lastOutcome)}
           </p>
         )}
+
+        <TeamMountain members={room.members} roped={room.phase.kind === "focus"} />
 
         <TeamTimer
           clock={clock}

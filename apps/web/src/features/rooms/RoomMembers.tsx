@@ -1,4 +1,5 @@
 import { findPeak, type RoomMember } from "@summit/shared";
+import { climberColor } from "./climberPlacement";
 
 const STATUS_LABELS: Record<RoomMember["status"], string> = {
   idle: "Ready",
@@ -30,14 +31,15 @@ export function RoomMembers({ members, myUserId, serverNow }: RoomMembersProps) 
         Climbers ({members.length})
       </h3>
       <ul className="mt-3 flex flex-col gap-2">
-        {members.map((member) => (
+        {members.map((member, index) => (
           <li
             key={member.userId}
             className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
           >
             <span
               aria-hidden="true"
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-teal-700 font-semibold text-white dark:bg-teal-600"
+              // The same color as their climber on the team mountain.
+              className={`grid size-9 shrink-0 place-items-center rounded-full font-semibold text-white ${climberColor(index).bg}`}
             >
               {member.displayName.charAt(0).toUpperCase()}
             </span>

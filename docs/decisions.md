@@ -802,3 +802,29 @@ page:_ simpler, but a typo would leave the form for a "not found" page.
 _Counting the countdown down with setInterval:_ drifts in background tabs
 (CLAUDE.md's timer rule). _Hiding late joiners:_ showing them as watching is
 friendlier and matches the server's spectator rule (entry 024).
+
+## 028 — The team mountain: progress on your own peak, one shared drawing
+
+_2026-10-20 · Phase 3_
+
+**Decision:** The room page shows every member on one stylized mountain.
+Each climber stands at the **fraction of their own current peak** they've
+climbed (`climbFraction` in `apps/web/src/features/rooms/climberPlacement.ts`),
+and a rope joins them from lowest to highest: taut during a running session,
+slack between sessions.
+
+- **Climbers at the same spot fan out sideways** (within 2% of the trail),
+  so a brand-new team at 0 m shows as three markers, not one.
+- **One color per climber,** by their place in the member list, used by both
+  the mountain marker and the member list avatar.
+- **The scenery is shared** with the solo mountain (`MountainScenery.tsx`).
+  Markers walk to new spots with Motion when climbs update after a
+  completed session.
+- **Accessible:** the drawing is one `role="img"` with a sentence listing
+  every climber's meters and peak.
+
+**Alternatives considered:** _Placing climbers by absolute meters on the
+tallest member's peak:_ meters only count on your own current peak, so
+1,000 m on Fuji and on Rainier would look the same though one is much
+further along. _One small mountain per member:_ clear, but loses the
+"roped together" picture and takes far more space with 8 climbers.

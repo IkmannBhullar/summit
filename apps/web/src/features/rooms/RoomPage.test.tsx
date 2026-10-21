@@ -71,6 +71,10 @@ describe("joining from the link", () => {
     expect(climbers.getByText("(you)")).toBeInTheDocument();
     expect(climbers.getByText("Host")).toBeInTheDocument();
     expect(climbers.getByText("Mt. Rainier · 1,250 m")).toBeInTheDocument();
+    // Both on the team mountain too.
+    expect(
+      screen.getByRole("img", { name: /^Rope team of 2 climbers: Ana .*; Ben / }),
+    ).toBeInTheDocument();
   });
 
   it("tidies a loosely typed code into the real link", async () => {

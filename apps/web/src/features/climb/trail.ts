@@ -104,3 +104,6 @@ export function toPathData(points: readonly Point[], closed = false): string {
   const commands = points.map((point, i) => `${i === 0 ? "M" : "L"}${point.x} ${point.y}`);
   return commands.join(" ") + (closed ? " Z" : "");
 }
+
+/** The trail as SVG path data, built once (it never changes). */
+export const TRAIL_PATH = toPathData(TRAIL);
