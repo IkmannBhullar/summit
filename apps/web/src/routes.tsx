@@ -1,10 +1,12 @@
 /**
  * The app's pages and their URLs.
  *
- *   /           the timer (works for guests)
- *   /login      sign in
- *   /register   create an account
- *   /account    profile and sign out (signed-in users only)
+ *   /              the timer (works for guests)
+ *   /login         sign in
+ *   /register      create an account
+ *   /account       profile and sign out (signed-in users only)
+ *   /rooms         start or join a rope team (signed-in users only)
+ *   /rooms/:code   a rope team room; the link is the invite (signed-in users only)
  *
  * Every page renders inside AppLayout (header + dialogs). The auth pages
  * also share CenteredPage, a simple centered column.
@@ -15,6 +17,8 @@ import { AccountPage } from "./features/auth/AccountPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { RequireAuth } from "./features/auth/RequireAuth";
+import { RoomPage } from "./features/rooms/RoomPage";
+import { RoomsPage } from "./features/rooms/RoomsPage";
 import { CenteredPage } from "./pages/CenteredPage";
 import { TimerPage } from "./pages/TimerPage";
 
@@ -23,6 +27,15 @@ export const routes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { index: true, element: <TimerPage /> },
+      {
+        // A guest opening an invite link signs in first, then comes straight back.
+        path: "rooms/:code",
+        element: (
+          <RequireAuth>
+            <RoomPage />
+          </RequireAuth>
+        ),
+      },
       {
         element: <CenteredPage />,
         children: [
@@ -33,6 +46,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequireAuth>
                 <AccountPage />
+              </RequireAuth>
+            ),
+          },
+          {
+            path: "rooms",
+            element: (
+              <RequireAuth>
+                <RoomsPage />
               </RequireAuth>
             ),
           },

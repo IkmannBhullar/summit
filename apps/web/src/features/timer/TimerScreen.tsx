@@ -1,5 +1,6 @@
 import { DEFAULT_TIMER_SETTINGS, type TimerSettings } from "@summit/shared";
 import { useCallback, useEffect, useState } from "react";
+import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { formatClock } from "./formatClock";
 import { MODE_LABELS } from "./modeLabels";
@@ -162,31 +163,5 @@ export function TimerScreen({
         You&apos;ll slide back down: this session&apos;s elevation won&apos;t count.
       </ConfirmDialog>
     </section>
-  );
-}
-
-/** The main call-to-action button. */
-function PrimaryButton({ onClick, children }: { onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl bg-teal-700 px-8 py-3 text-lg font-semibold text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
-    >
-      {children}
-    </button>
-  );
-}
-
-/** A quieter, outlined button for secondary actions. */
-function SecondaryButton({ onClick, children }: { onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl px-8 py-3 text-lg font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800"
-    >
-      {children}
-    </button>
   );
 }

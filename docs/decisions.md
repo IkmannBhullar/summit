@@ -774,3 +774,31 @@ socket.io-client; tests provide a `FakeRoomConnection` through
 network level, but Socket.io's own protocol on top would need an extra
 binding package and make tests hard to read. _Calling socket.io-client
 directly from components:_ every component test would need a server.
+
+## 027 — Room UI: the link is the invite, and the clock is recomputed, never counted
+
+_2026-10-20 · Phase 3_
+
+**Decision:** Two signed-in pages. `/rooms` starts a room or joins one with a
+code; `/rooms/:code` is the room, and its URL is the invite. A guest opening
+an invite signs in first and is brought straight back (RequireAuth).
+
+- **Codes are forgiving:** `k7q-m2x`, spaces, or a pasted link all work
+  (the shared `normalizeRoomCode`). The join form checks the code with
+  `GET /api/rooms/:code` before leaving the page, so a typo shows up under
+  the field. A loosely typed URL is replaced with the canonical one.
+- **Time on screen comes from `roomClock(phase, serverNow)`,** a pure
+  function: `serverNow = Date.now() + offsetMs`, re-rendered every 250 ms
+  and when the tab becomes visible. Nothing counts ticks, so a throttled
+  background tab is correct the moment it's looked at.
+- **The dangerous actions ask first:** giving up, or leaving while in a
+  running session, slips the whole team, so both use a confirm dialog.
+- **Team alerts only for new results:** a completed session chimes and
+  notifies; a slip only notifies. The result already showing when you join
+  stays quiet.
+
+**Alternatives considered:** _Joining by navigating straight to the room
+page:_ simpler, but a typo would leave the form for a "not found" page.
+_Counting the countdown down with setInterval:_ drifts in background tabs
+(CLAUDE.md's timer rule). _Hiding late joiners:_ showing them as watching is
+friendlier and matches the server's spectator rule (entry 024).
