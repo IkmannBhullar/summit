@@ -7,9 +7,11 @@ import { installRequestParsing } from "./middleware/parsing";
 import { createAuthRouter, DEFAULT_AUTH_RATE_LIMIT, type RateLimitSettings } from "./routes/auth";
 import { createRoomsRouter, DEFAULT_ROOM_CREATE_LIMIT } from "./routes/rooms";
 import { createClimbRouter, createSessionsRouter, createTagsRouter } from "./routes/sessions";
+import { createStatsRouter } from "./routes/stats";
 import { createPasswordService } from "./services/passwords";
 import { createRoomService } from "./services/rooms";
 import { createSessionService } from "./services/sessions";
+import { createStatsService } from "./services/stats";
 import { createTokenService } from "./services/tokens";
 
 /** Everything the app needs from outside, passed in so tests can supply their own. */
@@ -55,6 +57,7 @@ export function createApp(deps: AppDependencies): Express {
   const { authenticate, requireAuth } = createAuthMiddleware(tokens);
   const sessions = createSessionService(prisma, deps.now);
   const rooms = createRoomService(prisma, { now: deps.now });
+  const stats = createStatsService(prisma, deps.now);
 
   // Order matters: parse requests, identify the user, then routes, then errors.
   installRequestParsing(app);
@@ -81,6 +84,7 @@ export function createApp(deps: AppDependencies): Express {
   app.use("/api/sessions", createSessionsRouter({ sessions, requireAuth }));
   app.use("/api/climb", createClimbRouter({ sessions, requireAuth }));
   app.use("/api/tags", createTagsRouter({ sessions, requireAuth }));
+  app.use("/api/stats", createStatsRouter({ stats, requireAuth }));
   app.use(
     "/api/rooms",
     createRoomsRouter({

@@ -912,3 +912,35 @@ chosen before **Start focus** and fixed for that session.
 colors later, but a free-text column is enough until there's a feature
 that needs more. _Changing a tag mid-session:_ needs an update endpoint
 and a rule for what the server already recorded; not worth it yet.
+
+## 032 — Stats are SQL in Postgres, in the user's time zone
+
+_2026-10-21 · Phase 4_
+
+**Decision:** `GET /api/stats?tz=America/Vancouver` (accounts only) returns
+totals, current and longest streak, a 365-day heatmap, minutes by hour of
+day, and minutes per tag. Each is one SQL query (`apps/server/src/services/stats.ts`)
+run with Prisma's `$queryRaw`, whose `${…}` values are sent as parameters.
+
+- **The browser sends its IANA time zone,** and Postgres converts with
+  `started_at AT TIME ZONE tz`, which applies the real rules, daylight
+  saving and law changes included. Writing the tests showed why this
+  matters: British Columbia stopped changing its clocks in 2026, and the
+  time zone database already knew. A hard-coded offset would have been
+  wrong twice a year, then wrong for good.
+- **Rules:** only completed sessions count toward minutes, streaks, and
+  charts. A session belongs to the local day and hour it started. The
+  current streak still counts if the last session was yesterday.
+- **Streaks use "gaps and islands":** number the distinct focus days in
+  order and subtract that number from each date. Consecutive days share the
+  result, so grouping by it gives each run and its length.
+- **Tags group with `lower(tag)`** and show their newest spelling, matching
+  the shared tag rule (entry 031).
+- **"Today" comes from the server's injectable clock,** so tests are exact.
+
+**Alternatives considered:** _Loading all sessions into Node and looping:_
+simple, but it moves every row over the network on every visit, and time
+zone math by hand is error-prone. _Storing a time zone on the user:_ steadier
+across devices, but wrong the moment someone travels; the browser always
+knows where it is now. _Precomputed daily totals:_ faster at huge scale, but
+they must be kept in sync and redone for each time zone.
