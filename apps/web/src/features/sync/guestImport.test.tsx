@@ -29,7 +29,8 @@ beforeEach(() => {
   accountSessions = [];
   importedBodies = [];
   skipCount = 0;
-  localStorage.setItem("summit:signed-in-hint", "1");
+  // This device remembers Ana as signed in (see rememberedUser.ts).
+  localStorage.setItem("summit:signed-in-user", JSON.stringify(ANA));
 
   server.use(
     http.get("*/api/auth/me", () =>
@@ -174,7 +175,7 @@ describe("importing guest history", () => {
   it("doesn't offer importing to guests", async () => {
     saveGuestSessions(2);
     signedIn = null;
-    localStorage.removeItem("summit:signed-in-hint");
+    localStorage.removeItem("summit:signed-in-user");
 
     render(<App />);
     await screen.findByRole("link", { name: "Sign in" });

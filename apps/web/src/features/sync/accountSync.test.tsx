@@ -49,8 +49,8 @@ beforeEach(() => {
   tooEarlyOnce = false;
   acceptOffline = true;
   finishNetworkDown = false;
-  // This device remembers a signed-in user (see useCurrentUser).
-  localStorage.setItem("summit:signed-in-hint", "1");
+  // This device remembers Ana as signed in (see rememberedUser.ts).
+  localStorage.setItem("summit:signed-in-user", JSON.stringify(ANA));
 
   const record = (request: Request) =>
     requests.push(`${request.method} ${new URL(request.url).pathname}`);
@@ -366,7 +366,7 @@ describe("tags", () => {
 describe("guests", () => {
   it("never touch the session API, and use this device's storage", async () => {
     signedIn = null;
-    localStorage.removeItem("summit:signed-in-hint");
+    localStorage.removeItem("summit:signed-in-user");
     render(<App />);
     const user = userEvent.setup();
 
@@ -381,7 +381,7 @@ describe("guests", () => {
 
   it("tag their sessions on this device, and get them offered next time", async () => {
     signedIn = null;
-    localStorage.removeItem("summit:signed-in-hint");
+    localStorage.removeItem("summit:signed-in-user");
     render(<App />);
     const user = userEvent.setup();
 

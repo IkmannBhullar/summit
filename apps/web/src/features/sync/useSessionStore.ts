@@ -18,6 +18,7 @@ import {
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useSessionHistory, type SessionHistory } from "../history/useSessionHistory";
+import { isServerUnreachable } from "../auth/useAuth";
 import { STATS_KEY } from "../stats/useStats";
 import type { TimerEvent } from "../timer/timerMachine";
 import {
@@ -45,6 +46,8 @@ export interface SessionStore {
   syncProblem: string | null;
   /** Finished sessions saved on this device, waiting to reach the account. */
   waitingToSync: number;
+  /** The account's climb or history couldn't be loaded: the server can't be reached. */
+  offline: boolean;
   /** Recently used tags, newest first, for the tag picker. */
   recentTags: string[];
 }
@@ -73,6 +76,7 @@ function useGuestStore(guestHistory: SessionHistory): SessionStore {
     handleTimerEvent,
     syncProblem: null,
     waitingToSync: 0,
+    offline: false,
     recentTags: tags,
   };
 }
@@ -180,6 +184,7 @@ function useAccountStore(userId: string | null): SessionStore {
     handleTimerEvent,
     syncProblem: outboxState.problem,
     waitingToSync: outboxState.waiting,
+    offline: [climb, history].some((query) => query.isError && isServerUnreachable(query.error)),
     recentTags: tags.data ?? [],
   };
 }

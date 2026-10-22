@@ -610,6 +610,7 @@ queue without touching the page.
 **Known gap until Phase 4:** signed in and offline, the session runs, but its
 start or finish can't reach the server, and the app says so ("Couldn't save
 your session to your account…"). The offline queue will hold and sync it.
+(Resolved in Phase 4: entries 034 and 035.)
 
 ---
 
@@ -1010,11 +1011,8 @@ happens, then sent oldest first.
   in the queue looked safer, but if that send failed it would be retried
   after the session ended, which is exactly the "late start" problem.
 
-**Known gap:** opening the app _fresh_ while the server is unreachable still
-starts in guest mode (Phase 2's rule, so the timer always works). Waiting
-outbox items are safe, but sessions done in that visit go to guest history,
-which the account can't import (they're after sign-up). Remembering the
-signed-in user on the device would close this.
+**Opening the app fresh while offline** used to fall back to guest mode,
+so sessions from that visit couldn't reach the account. Fixed in entry 035.
 
 **Alternatives considered:** _A service worker with Background Sync:_
 retries even after the tab closes, but Chrome-only, harder to test, and the
@@ -1022,3 +1020,38 @@ outbox already survives closing the tab. _IndexedDB:_ more room and async,
 but a few small JSON items fit localStorage. _Trusting the browser's
 times for every session:_ simple, but gives up the server-checked meters
 that the rest of the app is built on (decision 018).
+
+## 035 — Remember the signed-in user, so offline starts stay in account mode
+
+_2026-10-21 · Phase 4_
+
+**Decision:** The device remembers who is signed in (`signed-in-user` in
+localStorage: id, display name, email, sign-up date; never a password or
+the login token, which stays in its httpOnly cookie). If `/api/auth/me`
+can't be reached (no network, or a 5xx while the server is down or waking
+up), the app carries on as that user: account mode, with finished sessions
+going to their outbox (entry 034).
+
+- **The server still wins.** A 401 ("nobody is signed in") is never
+  overridden, and forgets the remembered user. The check runs again when
+  the connection returns.
+- **Requests no longer pause while the browser says it's offline**
+  (`networkMode: "always"`). TanStack Query's default made a truly offline
+  cold start sit on "Loading your climb…" forever; the tests hadn't caught
+  it because they simulate an unreachable server, not an offline browser.
+  Now requests fail fast and the page says what's unavailable.
+- **Offline is shown, not hidden:** the climb and history say they'll
+  appear when Summit can be reached, instead of loading forever or
+  claiming "No sessions yet".
+- Replaces the earlier yes/no "signed-in hint", which said _that_ someone
+  was signed in but not _who_, so there was no outbox to use offline.
+
+**Trade-off:** the email is now readable in this browser's storage. Anyone
+using this signed-in browser could already see it on the account page, and
+it's cleared on sign-out.
+
+**Alternatives considered:** _Keep starting offline visits as a guest:_
+simplest, but those sessions could never reach the account (guest import
+only takes sessions from before sign-up). _Store only the id and name:_
+less data on the device, but the account page would have nothing to show
+offline, and the email is the least sensitive part of a signed-in session.

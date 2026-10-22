@@ -18,6 +18,8 @@ export interface HistoryListProps {
   hasOlder?: boolean;
   /** Loads the next batch of older sessions. */
   onLoadOlder?: () => void;
+  /** Shown instead of the usual "no sessions yet" (e.g. when offline). */
+  emptyMessage?: string;
 }
 
 /** Past sessions grouped by day, newest first. */
@@ -27,6 +29,7 @@ export function HistoryList({
   locale,
   hasOlder = false,
   onLoadOlder,
+  emptyMessage = "No sessions yet. Your climbs will show up here.",
 }: HistoryListProps) {
   const [visibleCount, setVisibleCount] = useState(HISTORY_PAGE_SIZE);
 
@@ -53,9 +56,7 @@ export function HistoryList({
       </div>
 
       {sessions.length === 0 ? (
-        <p className="mt-2 text-slate-600 dark:text-slate-400">
-          No sessions yet. Your climbs will show up here.
-        </p>
+        <p className="mt-2 text-slate-600 dark:text-slate-400">{emptyMessage}</p>
       ) : (
         <div className="mt-3 flex flex-col gap-5">
           {groups.map((group) => (

@@ -97,8 +97,10 @@ function TimerPageContent({ userId }: { userId: string | null }) {
       {store.progress ? (
         <MountainView progress={store.progress} />
       ) : (
-        <p role="status" className="self-center text-slate-500">
-          Loading your climb…
+        <p role="status" className="self-center text-center text-slate-500">
+          {store.offline
+            ? "Can't reach Summit right now. Your climb will appear when it's back; sessions you finish are kept on this device."
+            : "Loading your climb…"}
         </p>
       )}
       <TimerScreen
@@ -148,6 +150,9 @@ function TimerPageContent({ userId }: { userId: string | null }) {
           now={now}
           hasOlder={store.hasOlder}
           onLoadOlder={store.loadOlder}
+          emptyMessage={
+            store.offline ? "Your history will show when Summit can be reached." : undefined
+          }
         />
       </div>
 
