@@ -468,6 +468,76 @@ describe("tags", () => {
   );
 });
 
+describe("POST /api/sessions/offline (the browser's outbox)", () => {
+  /**
+   * A session the browser finished while offline, starting `minutesAfterSignup`
+   * after the account was created. The account's createdAt comes from the
+   * database's real clock, so the app's clock is moved past it first.
+   */
+  function offlineSession(minutesAfterSignup: number, overrides: Partial<FocusSession> = {}) {
+    const start = signedUpAt + minutesAfterSignup * MIN;
+    return {
+      id: randomUUID(),
+      plannedMinutes: 25,
+      startedAt: new Date(start).toISOString(),
+      endedAt: new Date(start + 25 * MIN).toISOString(),
+      status: "COMPLETED",
+      tag: "Offline",
+      metersGained: 250,
+      roomId: null,
+      ...overrides,
+    } satisfies FocusSession;
+  }
+  let signedUpAt: number;
+
+  async function signInNow() {
+    const agent = await signIn();
+    signedUpAt = Date.now();
+    clock = signedUpAt + 2 * 60 * MIN; // two hours later, on the app's clock
+    return agent;
+  }
+
+  it("saves a session the server never saw start, flagged, and counts it toward the climb", async () => {
+    const agent = await signInNow();
+    const session = offlineSession(10);
+
+    const res = await agent.post("/api/sessions/offline").send({ sessions: [session] });
+
+    expect(ImportResultSchema.parse(res.body)).toEqual({ imported: 1, skipped: 0 });
+    const row = await prisma.focusSession.findUniqueOrThrow({ where: { id: session.id } });
+    expect(row).toMatchObject({ imported: true, status: "COMPLETED", metersGained: 250 });
+    expect(getCurrentClimb(await climb(agent))?.climb.metersGained).toBe(250);
+  });
+
+  // The outbox may send the same session again after a lost reply.
+  it("is safe to repeat", async () => {
+    const agent = await signInNow();
+    const session = offlineSession(10);
+    await agent.post("/api/sessions/offline").send({ sessions: [session] });
+
+    const again = await agent.post("/api/sessions/offline").send({ sessions: [session] });
+
+    expect(ImportResultSchema.parse(again.body)).toEqual({ imported: 0, skipped: 1 });
+  });
+
+  it("refuses sessions from before sign-up (that's what guest import is for)", async () => {
+    const agent = await signInNow();
+
+    const res = await agent.post("/api/sessions/offline").send({ sessions: [offlineSession(-60)] });
+
+    expect(ImportResultSchema.parse(res.body)).toEqual({ imported: 0, skipped: 1 });
+  });
+
+  it("refuses more than 50 sessions in one request (400)", async () => {
+    const agent = await signInNow();
+    const sessions = Array.from({ length: 51 }, (_, i) => offlineSession(-1000 - i * 30));
+
+    const res = await agent.post("/api/sessions/offline").send({ sessions });
+
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("authentication", () => {
   it.each([
     ["POST", "/api/sessions"],
@@ -477,6 +547,7 @@ describe("authentication", () => {
     ["GET", "/api/climb"],
     ["GET", "/api/tags/recent"],
     ["POST", "/api/sessions/import"],
+    ["POST", "/api/sessions/offline"],
   ])("%s %s requires sign-in (401)", async (method, path) => {
     const req = method === "GET" ? request(app).get(path) : request(app).post(path);
 

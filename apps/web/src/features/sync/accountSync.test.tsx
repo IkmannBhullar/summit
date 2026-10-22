@@ -32,6 +32,10 @@ let serverSessions: FocusSession[];
 let requests: string[];
 /** Makes the next completion answer SESSION_TOO_EARLY (Retry-After: 1) first. */
 let tooEarlyOnce: boolean;
+/** Whether the fake server's offline route accepts what it's sent. */
+let acceptOffline: boolean;
+/** While true, completing or giving up fails as if the network were down. */
+let finishNetworkDown: boolean;
 
 const apiError = (status: number, code: string, message: string, headers?: HeadersInit) =>
   HttpResponse.json({ error: { code, message } }, { status, headers });
@@ -43,6 +47,8 @@ beforeEach(() => {
   serverSessions = [];
   requests = [];
   tooEarlyOnce = false;
+  acceptOffline = true;
+  finishNetworkDown = false;
   // This device remembers a signed-in user (see useCurrentUser).
   localStorage.setItem("summit:signed-in-hint", "1");
 
@@ -59,6 +65,14 @@ beforeEach(() => {
     http.get("*/api/sessions", ({ request }) => {
       record(request);
       return HttpResponse.json({ sessions: finishedFor(), nextCursor: null });
+    }),
+    // The outbox's route for sessions the server never saw start.
+    http.post("*/api/sessions/offline", async ({ request }) => {
+      record(request);
+      const { sessions } = (await request.json()) as { sessions: FocusSession[] };
+      if (!acceptOffline) return HttpResponse.json({ imported: 0, skipped: sessions.length });
+      serverSessions.push(...sessions);
+      return HttpResponse.json({ imported: sessions.length, skipped: 0 });
     }),
     http.get("*/api/tags/recent", () => HttpResponse.json({ tags: recentTags(serverSessions) })),
     http.get("*/api/climb", ({ request }) => {
@@ -87,6 +101,7 @@ beforeEach(() => {
     }),
     http.post("*/api/sessions/:id/:action", ({ request, params }) => {
       record(request);
+      if (finishNetworkDown) return HttpResponse.error();
       const session = serverSessions.find((s) => s.id === params.id);
       if (!session) return apiError(404, "NOT_FOUND", "Session not found.");
       if (params.action === "complete") {
@@ -217,9 +232,12 @@ describe("signed in", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("says so when a session couldn't be saved", async () => {
+  // The start never reached the server (say the network dropped right then):
+  // the outbox saves the finished session through the offline route instead.
+  it("saves a session the server never saw start", async () => {
     const user = await renderSignedIn();
     server.use(
+      http.post("*/api/sessions", () => HttpResponse.error()),
       http.post("*/api/sessions/:id/complete", () =>
         apiError(404, "NOT_FOUND", "Session not found."),
       ),
@@ -227,10 +245,84 @@ describe("signed in", () => {
 
     await user.click(screen.getByRole("button", { name: "Start focus" }));
     advance(25 * MIN);
+    window.dispatchEvent(new Event("online"));
+
+    expect(
+      await screen.findByRole("img", { name: "Climber at 250 m of 3,776 m on Mt. Fuji" }),
+    ).toBeInTheDocument();
+    expect(requests).toContain("POST /api/sessions/offline");
+  });
+
+  it("says so when the server won't accept a session finished offline", async () => {
+    acceptOffline = false;
+    const user = await renderSignedIn();
+    server.use(
+      http.post("*/api/sessions", () => HttpResponse.error()),
+      http.post("*/api/sessions/:id/complete", () =>
+        apiError(404, "NOT_FOUND", "Session not found."),
+      ),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Start focus" }));
+    advance(25 * MIN);
+    window.dispatchEvent(new Event("online"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Couldn't save your session to your account: Session not found.",
+      "A session you finished offline couldn't be added to your account.",
     );
+  });
+
+  it("keeps a session on this device while offline, and sends it when back online", async () => {
+    const user = await renderSignedIn();
+    await user.click(screen.getByRole("button", { name: "Start focus" }));
+    await vi.waitFor(() => expect(serverSessions).toHaveLength(1));
+    // The connection drops before the session ends.
+    finishNetworkDown = true;
+
+    advance(25 * MIN);
+
+    expect(
+      await screen.findByText(/1 finished session is saved on this device/),
+    ).toBeInTheDocument();
+    finishNetworkDown = false;
+    window.dispatchEvent(new Event("online"));
+
+    expect(
+      await screen.findByRole("img", { name: "Climber at 250 m of 3,776 m on Mt. Fuji" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/saved on this device/)).not.toBeInTheDocument();
+  });
+
+  // Each account has its own outbox: never send another person's sessions.
+  it("leaves another account's waiting sessions alone", async () => {
+    const theirs = makeSession(new Date(T0 - 60 * MIN).toISOString());
+    localStorage.setItem(
+      "summit:outbox:22222222-2222-4222-8222-222222222222",
+      JSON.stringify([{ kind: "finish", session: theirs }]),
+    );
+
+    await renderSignedIn();
+    await screen.findByRole("region", { name: "History" });
+
+    expect(requests.some((request) => request.includes(theirs.id))).toBe(false);
+  });
+
+  // Saved the moment the session ended, so a closed tab or reload loses nothing.
+  it("sends a session left waiting from an earlier visit", async () => {
+    const waiting = makeSession(new Date(T0 - 60 * MIN).toISOString());
+    serverSessions.push({ ...waiting, status: "RUNNING", endedAt: null, metersGained: 0 });
+    localStorage.setItem(
+      `summit:outbox:${ANA.id}`,
+      JSON.stringify([{ kind: "finish", session: waiting }]),
+    );
+
+    await renderSignedIn();
+
+    expect(
+      await screen.findByRole("img", { name: "Climber at 250 m of 3,776 m on Mt. Fuji" }),
+    ).toBeInTheDocument();
+    expect(requests).toContain(`POST /api/sessions/${waiting.id}/complete`);
+    expect(JSON.parse(localStorage.getItem(`summit:outbox:${ANA.id}`) ?? "null")).toEqual([]);
   });
 
   // Opening the app mustn't replay celebrations for summits reached long ago.

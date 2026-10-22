@@ -145,3 +145,55 @@ describe("selectImportable", () => {
     expect(result.skipped.every((s) => s.reason === "OVERLAPS")).toBe(true);
   });
 });
+
+describe("selectImportable for offline sessions", () => {
+  const DAY = 24 * 60 * MIN;
+  // A month after signing up.
+  const LATER = new Date(SIGNUP.getTime() + 30 * DAY);
+  const runOffline = (candidates: FocusSession[], existing: Interval[] = []) =>
+    selectImportable(candidates, {
+      accountCreatedAt: SIGNUP,
+      now: LATER,
+      existing,
+      source: "offline",
+    });
+  const at = (msBeforeLater: number) => new Date(LATER.getTime() - msBeforeLater).toISOString();
+
+  it("accepts a recent session from after sign-up (the opposite of guest history)", () => {
+    const result = runOffline([session(at(2 * 60 * MIN))]);
+
+    expect(result.accepted).toHaveLength(1);
+  });
+
+  it("refuses sessions from before sign-up", () => {
+    const result = runOffline([session("2026-10-17T09:00:00.000Z")]);
+
+    expect(reasons(result)).toEqual(["BEFORE_SIGNUP"]);
+  });
+
+  it("refuses sessions that ended more than 7 days ago", () => {
+    const result = runOffline([session(at(7 * DAY + 30 * MIN)), session(at(6 * DAY))]);
+
+    expect(reasons(result)).toEqual(["TOO_OLD"]);
+    expect(result.accepted).toHaveLength(1);
+  });
+
+  // The checks that make any unwatched session plausible still apply.
+  it("still refuses future, too-short, and overlapping sessions", () => {
+    const result = runOffline(
+      [
+        session(at(-60 * MIN)), // ends in the future
+        session(at(3 * 60 * MIN), { endedAt: at(3 * 60 * MIN - 3 * MIN) }), // "25 min" in 3
+        session(at(5 * 60 * MIN)), // overlaps an existing session
+      ],
+      [{ start: LATER.getTime() - 5 * 60 * MIN, end: LATER.getTime() - 4 * 60 * MIN }],
+    );
+
+    expect(reasons(result).sort()).toEqual(["IN_THE_FUTURE", "OVERLAPS", "TOO_SHORT"]);
+  });
+
+  it("is still guest import by default", () => {
+    // 12:01 is just after sign-up (12:00) and ends before the guest tests' "now" (12:30).
+    expect(reasons(run([session("2026-10-18T12:01:00.000Z")]))).toEqual(["AFTER_SIGNUP"]);
+  });
+});

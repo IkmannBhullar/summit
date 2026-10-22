@@ -1,10 +1,14 @@
 /**
- * Which guest sessions may be imported into an account.
+ * Which sessions the server accepts without having watched them live:
  *
- * Imported history happened in a browser, so the server never saw it live
- * and can't verify it the way it checks real sessions (decision 018). These
- * rules keep fabricated history at least *physically plausible*, and every
- * imported row is flagged so features like leaderboards can leave it out.
+ * - "guest": history from before signing up (the "import N sessions?" prompt)
+ * - "offline": sessions a signed-in user finished while the server couldn't
+ *   be reached, sent later from the browser's outbox
+ *
+ * The server never saw these happen, so it can't verify them the way it
+ * checks real sessions (decision 018). These rules keep them at least
+ * *physically plausible*, and every such row is flagged `imported` so
+ * features like leaderboards can leave it out.
  *
  * A pure function: no database, no clock (both passed in), easy to test.
  */
@@ -14,6 +18,12 @@ import { metersEarned, type FocusSession } from "@summit/shared";
 export const CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
 /** Same allowance as live completion (decision 018). */
 const COMPLETION_TOLERANCE_MS = 10_000;
+/**
+ * How old an offline session may be. A real outbox empties as soon as the
+ * connection is back; the limit stops anyone "remembering" months of fake
+ * sessions through this route.
+ */
+export const OFFLINE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
 /** A time range something occupied, half-open: [start, end). */
 export interface Interval {
@@ -27,6 +37,8 @@ export type SkipReason =
   | "ROOM_SESSION"
   | "IN_THE_FUTURE"
   | "AFTER_SIGNUP"
+  | "BEFORE_SIGNUP"
+  | "TOO_OLD"
   | "TOO_SHORT"
   | "OVERLAPS"
   | "DUPLICATE_ID";
@@ -45,11 +57,18 @@ const overlaps = (a: Interval, b: Interval) => a.start < b.end && b.start < a.en
  * @param context.accountCreatedAt - Guest history must predate the account.
  * @param context.now - Sessions can't end in the future.
  * @param context.existing - Time ranges of sessions the account already has.
+ * @param context.source - "guest" (before sign-up) or "offline" (after it, recent).
  */
 export function selectImportable(
   candidates: readonly FocusSession[],
-  context: { accountCreatedAt: Date; now: Date; existing: readonly Interval[] },
+  context: {
+    accountCreatedAt: Date;
+    now: Date;
+    existing: readonly Interval[];
+    source?: "guest" | "offline";
+  },
 ): ImportCandidateResult {
+  const source = context.source ?? "guest";
   const accepted: FocusSession[] = [];
   const skipped: ImportCandidateResult["skipped"] = [];
   const occupied: Interval[] = [...context.existing];
@@ -87,11 +106,25 @@ export function selectImportable(
       skip("IN_THE_FUTURE");
       continue;
     }
-    // Guest history happened before signing up; later sessions should have
-    // gone through the live, server-checked API.
-    if (interval.start >= context.accountCreatedAt.getTime()) {
-      skip("AFTER_SIGNUP");
-      continue;
+    const signedUp = context.accountCreatedAt.getTime();
+    if (source === "guest") {
+      // Guest history happened before signing up; later sessions should have
+      // gone through the live, server-checked API (or the offline outbox).
+      if (interval.start >= signedUp) {
+        skip("AFTER_SIGNUP");
+        continue;
+      }
+    } else {
+      // Offline sessions are an account's own, so they come after sign-up,
+      // and they're recent: the outbox sends them as soon as it can.
+      if (interval.start < signedUp) {
+        skip("BEFORE_SIGNUP");
+        continue;
+      }
+      if (interval.end < context.now.getTime() - OFFLINE_MAX_AGE_MS) {
+        skip("TOO_OLD");
+        continue;
+      }
     }
     // A "completed" 25-minute session can't have lasted 3 minutes.
     if (

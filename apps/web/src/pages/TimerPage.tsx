@@ -44,7 +44,7 @@ export function TimerPage() {
 
 function TimerPageContent({ userId }: { userId: string | null }) {
   const { settings, preferences, updatePreferences } = useShell();
-  const { store, guestHistory } = useSessionStore(userId !== null);
+  const { store, guestHistory } = useSessionStore(userId);
   const guestImport = useGuestImport({
     guestHistory,
     declined: userId !== null && preferences.importDeclinedFor.includes(userId),
@@ -110,6 +110,17 @@ function TimerPageContent({ userId }: { userId: string | null }) {
         onTagChange={(focusTag) => updatePreferences({ focusTag })}
       />
       <div className="flex w-full flex-col items-center gap-8 lg:col-span-2">
+        {store.waitingToSync > 0 && (
+          // role="status": announced politely, it's information, not an error.
+          <p
+            role="status"
+            className="w-full max-w-md rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-200"
+          >
+            {store.waitingToSync === 1
+              ? "1 finished session is saved on this device, waiting to reach your account. It'll sync when you're back online."
+              : `${store.waitingToSync} finished sessions are saved on this device, waiting to reach your account. They'll sync when you're back online.`}
+          </p>
+        )}
         {store.syncProblem && (
           <p
             role="alert"

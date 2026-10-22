@@ -70,6 +70,18 @@ export const ImportSessionsInputSchema = z.object({
 });
 export type ImportSessionsInput = z.infer<typeof ImportSessionsInputSchema>;
 
+/** How many sessions one offline-outbox request may carry (it sends them one at a time). */
+export const MAX_OFFLINE_SESSIONS = 50;
+
+/**
+ * POST /api/sessions/offline: sessions a signed-in user finished while the
+ * server couldn't be reached. Answered with an ImportResult, like import.
+ */
+export const OfflineSessionsInputSchema = z.object({
+  sessions: z.array(FocusSessionSchema).min(1).max(MAX_OFFLINE_SESSIONS),
+});
+export type OfflineSessionsInput = z.infer<typeof OfflineSessionsInputSchema>;
+
 export const ImportResultSchema = z.object({
   /** Sessions saved to the account. */
   imported: z.number().int().nonnegative(),

@@ -977,3 +977,48 @@ start, but roughly 100 kB more JavaScript and less control over the
 accessible output. These charts are a grid of squares and 24 bars.
 _Scaling the heatmap down to fit phones:_ the squares get too small to read
 or tap; scrolling keeps them readable.
+
+## 034 — Offline: a saved, ordered outbox, and a separate door for unwatched sessions
+
+_2026-10-21 · Phase 4_
+
+**Decision:** A signed-in user's session reports go through an **outbox**
+(`apps/web/src/features/sync/outbox.ts`): a first-in, first-out queue saved
+in localStorage under `outbox:<userId>` the moment each timer event
+happens, then sent oldest first.
+
+- **One queue, in order.** If an old "finished" reached the server after
+  a newer "started", the server would close the old one as abandoned (one
+  running session per user) and its meters would be lost.
+- **No duplicates:** each session keeps its browser-made UUID, and the
+  server treats a repeat of an id as the same request (decision 018), so
+  retrying after an unknown outcome is safe.
+- **Retries:** network errors, 5xx, and 401 wait 1 s, 2 s, 4 s… (at most
+  60 s); `SESSION_TOO_EARLY` waits its `Retry-After`; the browser's `online`
+  event and app start try at once (even mid-request). A definite 4xx is
+  dropped with a message.
+- **A start that wasn't confirmed by the time its session ends is dropped.**
+  Sent late, it would start the server's clock late and the completion
+  would be refused as too early. The finish goes next: the server either
+  completes it (the start did arrive) or answers 404, and then the whole
+  session is sent to `POST /api/sessions/offline`.
+- **The offline route** uses the guest-import plausibility rules with a
+  different window: after sign-up and ended within 7 days (guest history
+  must be _before_ sign-up, so reusing guest import as-is would have
+  rejected every offline session). Rows are flagged `imported`.
+- **Mutation testing removed a harmful guard:** keeping an in-flight start
+  in the queue looked safer, but if that send failed it would be retried
+  after the session ended, which is exactly the "late start" problem.
+
+**Known gap:** opening the app _fresh_ while the server is unreachable still
+starts in guest mode (Phase 2's rule, so the timer always works). Waiting
+outbox items are safe, but sessions done in that visit go to guest history,
+which the account can't import (they're after sign-up). Remembering the
+signed-in user on the device would close this.
+
+**Alternatives considered:** _A service worker with Background Sync:_
+retries even after the tab closes, but Chrome-only, harder to test, and the
+outbox already survives closing the tab. _IndexedDB:_ more room and async,
+but a few small JSON items fit localStorage. _Trusting the browser's
+times for every session:_ simple, but gives up the server-checked meters
+that the rest of the app is built on (decision 018).

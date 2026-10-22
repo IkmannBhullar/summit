@@ -6,6 +6,7 @@
  *   POST /api/sessions/:id/abandon    give up                     → 200
  *   GET  /api/sessions?limit&cursor   history page, newest first  → 200
  *   POST /api/sessions/import         copy guest history in       → 200 { imported, skipped }
+ *   POST /api/sessions/offline        sessions finished offline   → 200 { imported, skipped }
  *   GET  /api/climb                   climb progress              → 200
  *   GET  /api/tags/recent             recently used tags          → 200 { tags }
  *
@@ -13,6 +14,7 @@
  */
 import {
   ImportSessionsInputSchema,
+  OfflineSessionsInputSchema,
   ListSessionsQuerySchema,
   StartSessionInputSchema,
   type ClimbResponse,
@@ -59,6 +61,13 @@ export function createSessionsRouter(deps: {
   router.post("/:id/abandon", async (req, res) => {
     const session = await sessions.abandon(signedInUserId(req), sessionIdFrom(req));
     const body: SessionResponse = { session };
+    res.json(body);
+  });
+
+  // The browser's outbox, for sessions the server never saw start.
+  router.post("/offline", async (req, res) => {
+    const { sessions: candidates } = validate(OfflineSessionsInputSchema, req.body);
+    const body: ImportResult = await sessions.saveOfflineSessions(signedInUserId(req), candidates);
     res.json(body);
   });
 
