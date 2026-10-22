@@ -6,6 +6,7 @@ import { useAudioUnlock } from "./features/alerts/useAudioUnlock";
 import { usePreferences } from "./features/alerts/usePreferences";
 import { AccountLink } from "./features/auth/AccountLink";
 import { RoomsLink } from "./features/rooms/RoomsLink";
+import { StatsLink } from "./features/stats/StatsLink";
 import { UpdatePrompt } from "./features/pwa/UpdatePrompt";
 import { SettingsDialog } from "./features/settings/SettingsDialog";
 import { useSettings } from "./features/settings/useSettings";
@@ -49,6 +50,7 @@ export function AppLayout() {
           >
             <SlidersIcon />
           </button>
+          <StatsLink />
           <RoomsLink />
           <AccountLink />
         </div>

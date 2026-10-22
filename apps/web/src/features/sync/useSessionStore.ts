@@ -18,6 +18,7 @@ import {
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 import { useSessionHistory, type SessionHistory } from "../history/useSessionHistory";
+import { STATS_KEY } from "../stats/useStats";
 import type { TimerEvent } from "../timer/timerMachine";
 import {
   abandonSession,
@@ -114,6 +115,8 @@ function useAccountStore(enabled: boolean): SessionStore {
         queryClient.invalidateQueries({ queryKey: HISTORY_KEY }),
         queryClient.invalidateQueries({ queryKey: CLIMB_KEY }),
         queryClient.invalidateQueries({ queryKey: RECENT_TAGS_KEY }),
+        // Stats change too; the stats page refetches when it's next shown.
+        queryClient.invalidateQueries({ queryKey: STATS_KEY }),
       ]),
   });
 

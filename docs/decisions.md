@@ -944,3 +944,36 @@ zone math by hand is error-prone. _Storing a time zone on the user:_ steadier
 across devices, but wrong the moment someone travels; the browser always
 knows where it is now. _Precomputed daily totals:_ faster at huge scale, but
 they must be kept in sync and redone for each time zone.
+
+## 033 — The stats page: hand-drawn SVG charts, each with a text version
+
+_2026-10-21 · Phase 4_
+
+**Decision:** `/stats` shows four cards (current and longest streak, total
+focus, sessions), a GitHub-style year heatmap, focus by hour, and time per
+tag, all drawn by hand in SVG. No chart library.
+
+- **Accessible by design:** each chart is one `role="img"` with a sentence
+  summary ("Focus on 42 of the last 365 days"), plus a "Show as a table"
+  alternative. Time per tag is a plain list of text with decorative bars.
+- **The heatmap fits a laptop** (53 weeks × 13 px) and scrolls sideways
+  inside its own box on phones, starting at today. The box is focusable
+  (`tabIndex={0}`, labelled) so keyboards can scroll it, and the weekday
+  labels sit outside it so they never scroll away.
+- **Dates stay dates:** the server sends local calendar dates
+  ("2026-10-21"), and the browser does its arithmetic on them as UTC
+  midnights, so its own time zone can't shift a day.
+- **Fresh after each session:** finishing a session invalidates the stats
+  cache, along with history, climb, and recent tags.
+- **Guests** get a short explanation and a sign-in link that returns to
+  `/stats` (decision from the Phase 4 plan: stats are accounts only).
+- **The header link appears from 640 px;** on phones it sits beside History,
+  because the signed-in header has no room for a fifth button.
+- `color-scheme: light dark` on `:root`, so the browser's own scrollbars and
+  controls follow dark mode too (the heatmap showed a white scrollbar).
+
+**Alternatives considered:** _A chart library (Recharts, visx):_ faster to
+start, but roughly 100 kB more JavaScript and less control over the
+accessible output. These charts are a grid of squares and 24 bars.
+_Scaling the heatmap down to fit phones:_ the squares get too small to read
+or tap; scrolling keeps them readable.

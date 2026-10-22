@@ -2,3 +2,12 @@
    classes. There's no tailwind.config.js; customization goes in this file
    (with @theme) when we need it. */
 @import "tailwindcss";
+
+/*
+ * Tell the browser this app has both a light and a dark look (dark follows
+ * the system setting, like Tailwind's dark: classes). Without this, the
+ * browser's own parts, like scrollbars, stay light in dark mode.
+ */
+:root {
+  color-scheme: light dark;
+}

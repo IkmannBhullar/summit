@@ -1,15 +1,20 @@
 // Tests for the history list: grouping, labels, empty state, and paging.
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { makeSession } from "../../test/fixtures";
 import { HISTORY_PAGE_SIZE, HistoryList } from "./HistoryList";
 
 const NOW = new Date("2026-10-17T15:00:00.000Z");
 
+/** The list links to /stats, and links need a router; MemoryRouter is one that lives in memory. */
+const renderInRouter = (ui: ReactElement) => render(ui, { wrapper: MemoryRouter });
+
 /** Renders the list in en-US so labels are predictable. */
 const renderList = (sessions: Parameters<typeof HistoryList>[0]["sessions"]) =>
-  render(<HistoryList sessions={sessions} now={NOW} locale="en-US" />);
+  renderInRouter(<HistoryList sessions={sessions} now={NOW} locale="en-US" />);
 
 describe("HistoryList", () => {
   it("shows a friendly empty state", () => {

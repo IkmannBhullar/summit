@@ -1,5 +1,6 @@
 import type { FocusSession } from "@summit/shared";
 import { useState } from "react";
+import { Link } from "react-router";
 import { timeLabel } from "../../lib/dates";
 import { groupByDay } from "./groupByDay";
 
@@ -39,9 +40,17 @@ export function HistoryList({
 
   return (
     <section aria-labelledby="history-heading" className="w-full max-w-md">
-      <h2 id="history-heading" className="text-lg font-semibold">
-        History
-      </h2>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id="history-heading" className="text-lg font-semibold">
+          History
+        </h2>
+        <Link
+          to="/stats"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-teal-700 underline-offset-4 hover:underline dark:text-teal-400"
+        >
+          See your stats
+        </Link>
+      </div>
 
       {sessions.length === 0 ? (
         <p className="mt-2 text-slate-600 dark:text-slate-400">
