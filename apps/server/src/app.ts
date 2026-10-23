@@ -45,12 +45,13 @@ export function createApp(deps: AppDependencies): Express {
   // attackers which framework (and possible vulnerabilities) we run.
   app.disable("x-powered-by");
 
-  // In production the server sits behind the hosting platform's proxy, so
-  // every request seems to come from the proxy. Trusting ONE proxy hop makes
-  // req.ip the real visitor's address (from X-Forwarded-For), which the rate
-  // limiter needs. Locally there's no proxy, so trust nothing: otherwise
-  // anyone could fake their IP with that header.
-  app.set("trust proxy", config.isProduction ? 1 : false);
+  // In production the server sits behind proxies (Vercel's rewrite, then
+  // Render's load balancer), so every request seems to come from the last
+  // one. Trusting exactly that many hops makes req.ip the real visitor's
+  // address (from X-Forwarded-For), which the rate limiter needs. Locally
+  // there's no proxy, so trust nothing: otherwise anyone could fake their IP
+  // with that header. See TRUST_PROXY_HOPS in config/env.ts.
+  app.set("trust proxy", config.trustProxyHops > 0 ? config.trustProxyHops : false);
 
   const passwords = createPasswordService(config.bcryptRounds);
   const tokens = createTokenService(config.jwtSecret);

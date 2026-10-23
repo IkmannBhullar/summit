@@ -135,6 +135,11 @@ export function createRealtimeServer(
   const io: IoServer = new Server(httpServer, {
     // The browser library is installed with npm, not served from here.
     serveClient: false,
+    // How often the server checks the connection is alive (default 25 s).
+    // With HTTP long-polling (used behind Vercel's proxy), each held-open
+    // request returns at least this often, so 20 s keeps every request well
+    // short of proxy timeouts.
+    pingInterval: 20_000,
     // Defense against cross-site WebSocket hijacking: browsers always send
     // an Origin header, so refuse connections started by any other website.
     // (No Origin means a non-browser client, which can't carry a user's cookies.)

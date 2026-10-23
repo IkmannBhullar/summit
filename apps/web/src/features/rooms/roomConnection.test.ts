@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeRoomState } from "../../test/fakeRoomConnection";
 import {
   createSocketConnection,
+  parseTransports,
   REQUEST_TIMEOUT_MS,
   type ConnectionEvent,
   type RoomSocket,
@@ -149,5 +150,17 @@ describe("createSocketConnection", () => {
 
     expect(fake.socket.connect).toHaveBeenCalledOnce();
     expect(fake.socket.disconnect).toHaveBeenCalledOnce();
+  });
+});
+
+describe("parseTransports", () => {
+  it.each([
+    ["polling", ["polling"]],
+    ["polling, websocket", ["polling", "websocket"]],
+    ["", undefined],
+    [undefined, undefined],
+    ["carrier-pigeon", undefined],
+  ])("reads %j as %j", (value, expected) => {
+    expect(parseTransports(value)).toEqual(expected);
   });
 });

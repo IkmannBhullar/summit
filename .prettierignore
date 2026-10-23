@@ -6,3 +6,6 @@ package-lock.json
 
 # The project guide is kept exactly as written.
 CLAUDE.md
+
+# Local copies of the repo made by Claude Code's parallel sessions (git worktrees).
+.claude/worktrees/

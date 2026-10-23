@@ -11,7 +11,14 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   // Never lint generated or installed code.
-  globalIgnores(["**/dist/**", "**/coverage/**", "**/node_modules/**", "**/generated/**"]),
+  globalIgnores([
+    "**/dist/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/generated/**",
+    // Local copies of the repo made by Claude Code's parallel sessions.
+    ".claude/worktrees/**",
+  ]),
 
   // ESLint's own recommended rules for all JavaScript (catches typos,
   // unreachable code, etc.).

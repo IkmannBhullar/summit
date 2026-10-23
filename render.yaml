@@ -1,0 +1,43 @@
+# Render Blueprint: the Summit API and its Postgres database, described as
+# code. Render reads this file when you create a Blueprint from the repo
+# (see docs/deploy.md). Changing it here and pushing updates the setup.
+databases:
+  - name: summit-db
+    plan: free
+    databaseName: summit
+    user: summit
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: summit-api
+    runtime: node
+    plan: free
+    # The repo is an npm workspaces monorepo, so install from the root.
+    # --include=dev: the build needs esbuild and the Prisma CLI, and
+    # NODE_ENV=production would otherwise skip devDependencies.
+    buildCommand: npm ci --include=dev && npm run build -w apps/server
+    # Applies new migrations and (re)seeds the peaks, then starts the bundle.
+    # (On paid plans this could be a pre-deploy command instead.)
+    startCommand: npm run start:prod -w apps/server
+    # Render waits for this to answer 200 before sending traffic to a deploy.
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: summit-db
+          property: connectionString
+      # A long random secret Render generates once. It never appears in the repo.
+      - key: JWT_SECRET
+        generateValue: true
+      # Vercel's rewrite, then Render's load balancer (see config/env.ts).
+      - key: TRUST_PROXY_HOPS
+        value: "2"
+      # The web app's address, e.g. https://summit.vercel.app. You enter it
+      # when creating the Blueprint (sync: false = not stored in this file).
+      - key: WEB_ORIGIN
+        sync: false

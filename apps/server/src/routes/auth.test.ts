@@ -267,6 +267,27 @@ describe("rate limiting", () => {
     expect(blocked.headers["ratelimit-policy"]).toBeDefined();
   });
 
+  // Behind Vercel's rewrite and Render's load balancer, X-Forwarded-For reads
+  // "visitor, vercel". Trusting 2 hops finds the visitor; trusting only 1
+  // would see Vercel, and lump every visitor into one rate-limit bucket.
+  it.each([
+    [2, "limits each visitor separately", 401],
+    [1, "would lump visitors together", 429],
+  ])("behind two proxies, trusting %i hop(s) %s", async (hops, _label, secondStatus) => {
+    const app = buildApp({
+      config: { ...testConfig, trustProxyHops: hops },
+      authRateLimit: { windowMs: 60_000, limit: 1 },
+    });
+    const attemptFrom = (visitor: string) =>
+      request(app)
+        .post("/api/auth/login")
+        .set("X-Forwarded-For", `${visitor}, 76.76.21.21`) // the last one is "Vercel"
+        .send({ email: ana.email, password: "guess" });
+
+    expect((await attemptFrom("203.0.113.1")).status).toBe(401);
+    expect((await attemptFrom("203.0.113.2")).status).toBe(secondStatus);
+  });
+
   it("doesn't limit routes other than login and register", async () => {
     const app = buildApp({ authRateLimit: { windowMs: 60_000, limit: 1 } });
 

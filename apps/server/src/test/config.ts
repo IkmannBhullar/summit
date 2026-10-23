@@ -19,4 +19,5 @@ export const testConfig: Config = {
   // Fine for tests, never for real passwords (the env schema requires 10+).
   bcryptRounds: 4,
   webOrigin: "http://localhost:5173",
+  trustProxyHops: 0,
 };

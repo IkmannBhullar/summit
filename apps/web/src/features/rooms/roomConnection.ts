@@ -59,8 +59,25 @@ export type RoomSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
  */
 export function createRoomSocket(): RoomSocket {
   const url = import.meta.env.VITE_API_URL || window.location.origin;
+  const transports = parseTransports(import.meta.env.VITE_REALTIME_TRANSPORTS);
   // autoConnect: false, so nothing happens until open() is called.
-  return io(url, { autoConnect: false, withCredentials: true });
+  return io(url, { autoConnect: false, withCredentials: true, ...(transports && { transports }) });
+}
+
+/**
+ * Reads VITE_REALTIME_TRANSPORTS ("polling", "websocket", or both, comma
+ * separated). In production the browser reaches the server through Vercel's
+ * rewrite, which forwards plain HTTP but not WebSockets, so it's set to
+ * "polling" there. Unset: Socket.io's default (polling, upgrading to WebSocket).
+ */
+export function parseTransports(
+  value: string | undefined,
+): ("polling" | "websocket")[] | undefined {
+  const transports = (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part): part is "polling" | "websocket" => part === "polling" || part === "websocket");
+  return transports.length > 0 ? transports : undefined;
 }
 
 /** Turns "no answer in time" into a result, instead of an exception. */

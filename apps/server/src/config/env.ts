@@ -28,6 +28,12 @@ const EnvSchema = z.object({
   }),
   // Where the web app is served from. Live connections (WebSockets) from
   // any other website are refused. Stored as a bare origin, without a path.
+  // How many proxies sit in front of the server and add X-Forwarded-For:
+  // 0 locally; 1 behind Render; 2 behind Vercel's rewrite AND Render. Express
+  // uses it to find the visitor's real IP (the login rate limit needs it).
+  // Too low and every visitor looks like the proxy; too high and anyone can
+  // fake their IP with the header.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   WEB_ORIGIN: z
     .url({ protocol: /^https?$/, message: "must be an http(s) URL like http://localhost:5173" })
     .default("http://localhost:5173")
@@ -45,6 +51,8 @@ export interface Config {
   bcryptRounds: number;
   /** The web app's origin, e.g. "http://localhost:5173" (scheme, host, port). */
   webOrigin: string;
+  /** Proxies to trust for the visitor's IP (Express "trust proxy"). */
+  trustProxyHops: number;
 }
 
 /**
@@ -71,5 +79,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     jwtSecret: parsed.JWT_SECRET,
     bcryptRounds: parsed.BCRYPT_ROUNDS,
     webOrigin: parsed.WEB_ORIGIN,
+    // Default: one proxy in production (the host's load balancer), none locally.
+    trustProxyHops: parsed.TRUST_PROXY_HOPS ?? (parsed.NODE_ENV === "production" ? 1 : 0),
   };
 }

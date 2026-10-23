@@ -17,7 +17,16 @@ describe("loadConfig", () => {
       jwtSecret: valid.JWT_SECRET,
       bcryptRounds: 12,
       webOrigin: "http://localhost:5173",
+      trustProxyHops: 0,
     });
+  });
+
+  it("trusts one proxy in production by default, or as many as TRUST_PROXY_HOPS says", () => {
+    expect(loadConfig({ ...valid, NODE_ENV: "production" }).trustProxyHops).toBe(1);
+    expect(
+      loadConfig({ ...valid, NODE_ENV: "production", TRUST_PROXY_HOPS: "2" }).trustProxyHops,
+    ).toBe(2);
+    expect(() => loadConfig({ ...valid, TRUST_PROXY_HOPS: "-1" })).toThrow(/TRUST_PROXY_HOPS/);
   });
 
   it("keeps only the origin of WEB_ORIGIN, and refuses something that isn't a web URL", () => {

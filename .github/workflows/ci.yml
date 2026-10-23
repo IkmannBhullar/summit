@@ -92,3 +92,8 @@ jobs:
       # when typecheck and tests pass, e.g. a broken import of a CSS file).
       - name: Build web app
         run: npm run build -w apps/web
+
+      # The bundle Render runs (scripts/build.mjs), so a deploy can't be the
+      # first place a bundling problem shows up.
+      - name: Build server bundle
+        run: npm run build -w apps/server
