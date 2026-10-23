@@ -6,9 +6,11 @@ import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import { TextField } from "../../components/TextField";
 import { ApiRequestError } from "../../lib/api";
 import { createRoom, findRoom } from "./roomsApi";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /** /rooms (signed-in only): start a new rope team, or join one with a code. */
 export function RoomsPage() {
+  usePageTitle("Rope teams");
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState<string>();

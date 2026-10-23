@@ -19,14 +19,15 @@ const SAME_SPOT = 0.02;
  * Full class names (not built from parts), so Tailwind finds them in the code.
  */
 export const CLIMBER_COLORS = [
-  { fill: "fill-teal-600", bg: "bg-teal-600" },
-  { fill: "fill-amber-500", bg: "bg-amber-500" },
-  { fill: "fill-violet-500", bg: "bg-violet-500" },
-  { fill: "fill-rose-500", bg: "bg-rose-500" },
-  { fill: "fill-sky-500", bg: "bg-sky-500" },
-  { fill: "fill-lime-600", bg: "bg-lime-600" },
-  { fill: "fill-orange-500", bg: "bg-orange-500" },
-  { fill: "fill-fuchsia-500", bg: "bg-fuchsia-500" },
+  // Dark enough that white initials meet the 4.5:1 contrast minimum (WCAG AA).
+  { fill: "fill-teal-700", bg: "bg-teal-700" },
+  { fill: "fill-amber-700", bg: "bg-amber-700" },
+  { fill: "fill-violet-600", bg: "bg-violet-600" },
+  { fill: "fill-rose-600", bg: "bg-rose-600" },
+  { fill: "fill-sky-700", bg: "bg-sky-700" },
+  { fill: "fill-lime-700", bg: "bg-lime-700" },
+  { fill: "fill-orange-700", bg: "bg-orange-700" },
+  { fill: "fill-fuchsia-700", bg: "bg-fuchsia-700" },
 ] as const;
 
 /** A member's color: by their place in the list (rooms hold at most 8). */

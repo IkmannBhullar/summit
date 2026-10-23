@@ -24,7 +24,7 @@ export function AccountLink() {
       to="/account"
       // The visible initial isn't a good name on its own.
       aria-label={`Account (${user.displayName})`}
-      className="inline-flex size-11 items-center justify-center rounded-full bg-teal-700 font-semibold text-white hover:bg-teal-800 dark:bg-teal-600"
+      className="inline-flex size-11 items-center justify-center rounded-full bg-teal-700 font-semibold text-white hover:bg-teal-800"
     >
       {user.displayName.charAt(0).toUpperCase()}
     </Link>

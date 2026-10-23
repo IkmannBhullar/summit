@@ -38,7 +38,7 @@ export function TagPicker({ value, onChange, recent }: TagPickerProps) {
                 onClick={() => onChange(selected ? "" : tag)}
                 className={`min-h-11 rounded-full px-4 text-sm font-medium ring-1 ${
                   selected
-                    ? "bg-teal-700 text-white ring-teal-700 dark:bg-teal-600 dark:ring-teal-600"
+                    ? "bg-teal-700 text-white ring-teal-700"
                     : "text-slate-700 ring-slate-300 hover:bg-slate-100 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-800"
                 }`}
               >

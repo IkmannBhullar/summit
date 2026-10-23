@@ -1,7 +1,9 @@
 import { useCurrentUser, useLogout } from "./useAuth";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /** /account (signed-in only, see RequireAuth): profile details and sign out. */
 export function AccountPage() {
+  usePageTitle("Your account");
   const { user } = useCurrentUser();
   // After signing out, RequireAuth sends us home: no navigation needed here.
   const logout = useLogout();

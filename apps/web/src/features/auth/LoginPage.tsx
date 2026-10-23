@@ -5,9 +5,11 @@ import { TextField } from "../../components/TextField";
 import { AuthForm } from "./AuthForm";
 import { formErrorMessage, validateForm } from "./formErrors";
 import { useCurrentUser, useLogin } from "./useAuth";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /** /login: sign in, then return to the page the user was trying to reach. */
 export function LoginPage() {
+  usePageTitle("Sign in");
   const { user } = useCurrentUser();
   const login = useLogin();
   const navigate = useNavigate();

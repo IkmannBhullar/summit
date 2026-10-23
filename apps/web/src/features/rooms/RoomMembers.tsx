@@ -48,7 +48,7 @@ export function RoomMembers({ members, myUserId, serverNow }: RoomMembersProps) 
               <p className="truncate font-medium">
                 {member.displayName}
                 {member.userId === myUserId && (
-                  <span className="font-normal text-slate-500"> (you)</span>
+                  <span className="font-normal text-slate-500 dark:text-slate-400"> (you)</span>
                 )}
                 {member.isHost && (
                   <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900 dark:text-amber-100">

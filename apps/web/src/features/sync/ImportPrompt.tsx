@@ -52,7 +52,7 @@ export function ImportPrompt({
           type="button"
           onClick={importNow}
           disabled={isImporting}
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60 dark:bg-teal-600 dark:hover:bg-teal-500"
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60 dark:bg-teal-700 dark:hover:bg-teal-800"
         >
           {isImporting ? "Importing…" : `Import ${sessionsLabel(count)}`}
         </button>

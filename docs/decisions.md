@@ -1055,3 +1055,44 @@ simplest, but those sessions could never reach the account (guest import
 only takes sessions from before sign-up). _Store only the id and name:_
 less data on the device, but the account page would have nothing to show
 offline, and the email is the least sensitive part of a signed-in session.
+
+## 036 — Accessibility: axe-core in tests, contrast in a real browser, keyboard paths fixed
+
+_2026-10-21 · Phase 4_
+
+**Decision:** Accessibility is checked three ways, because each finds what
+the others can't:
+
+1. **axe-core in the tests** (`apps/web/src/a11y.test.tsx`): every page and
+   dialog, as a guest and signed in, with data and tables open. It catches
+   missing labels, broken ARIA, duplicate ids, and heading problems, and
+   fails CI if any return. Color contrast is off there, since jsdom can't
+   compute colors.
+2. **axe-core in a real browser**, light and dark mode, contrast included.
+   This found that white text on teal-600 (dark mode buttons) is 3.66:1,
+   under WCAG AA's 4.5:1, plus a gray label at 3.74:1. Dark mode now uses
+   teal-700/800, and the climber colors are darker so white initials pass.
+3. **A keyboard walkthrough:** Tab order, the skip link, dialogs (focus
+   moves in, Esc closes, focus returns to the button that opened it).
+
+**Fixed:**
+
+- **A visible focus ring** for keyboard users (`:focus-visible`, 3 px teal,
+  lighter in dark mode). The app had relied on browser defaults.
+- **"Skip to content"**, the first Tab stop. It slides in from above when
+  focused (Tailwind's `not-sr-only` would have reset its padding).
+- **Focus moves to the new page's content** after following a link, so
+  keyboard and screen-reader users start at the top, not on a vanished link.
+- **A title for every page** ("Your stats · Summit"), which screen readers
+  announce (WCAG 2.4.2).
+- Motion needed no change: everything animated goes through Motion with
+  `reducedMotion="user"`, and there are no CSS animations.
+
+**Root cause worth fixing later:** the primary-button classes were copied
+into six files, so one contrast mistake spread to all of them. Those
+buttons should all use the shared `PrimaryButton`.
+
+**Alternatives considered:** _Lighthouse in CI:_ broader (performance,
+SEO), but needs a running build and a browser in CI; axe in the unit tests
+is fast and runs everywhere. _Manual checks only:_ nothing would stop a
+regression.

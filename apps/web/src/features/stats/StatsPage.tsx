@@ -7,12 +7,14 @@ import { HourChart } from "./HourChart";
 import { formatMinutes } from "./statsFormat";
 import { TagBreakdown } from "./TagBreakdown";
 import { useStats } from "./useStats";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /**
  * /stats: streaks, totals, a year heatmap, time of day, and time per tag.
  * Accounts only (the numbers come from the server); guests get a way in.
  */
 export function StatsPage() {
+  usePageTitle("Your stats");
   const { user, isLoading } = useCurrentUser();
   const stats = useStats(Boolean(user));
 

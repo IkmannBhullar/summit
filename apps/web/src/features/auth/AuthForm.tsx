@@ -41,7 +41,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-2 rounded-xl bg-teal-700 px-6 py-3 font-semibold text-white hover:bg-teal-800 disabled:opacity-60 dark:bg-teal-600 dark:hover:bg-teal-500"
+          className="mt-2 rounded-xl bg-teal-700 px-6 py-3 font-semibold text-white hover:bg-teal-800 disabled:opacity-60 dark:bg-teal-700 dark:hover:bg-teal-800"
         >
           {isSubmitting ? "Please wait…" : submitLabel}
         </button>

@@ -6,9 +6,11 @@ import { ApiRequestError } from "../../lib/api";
 import { AuthForm } from "./AuthForm";
 import { formErrorMessage, serverFieldErrors, validateForm } from "./formErrors";
 import { useCurrentUser, useRegister } from "./useAuth";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /** /register: create an account (which also signs you in). */
 export function RegisterPage() {
+  usePageTitle("Create your account");
   const { user } = useCurrentUser();
   const register = useRegister();
   const navigate = useNavigate();

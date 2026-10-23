@@ -28,7 +28,7 @@ export function NotificationPrompt({ onEnable, onDismiss }: NotificationPromptPr
         <button
           type="button"
           onClick={onEnable}
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 dark:bg-teal-700 dark:hover:bg-teal-800"
         >
           Turn on notifications
         </button>

@@ -11,3 +11,20 @@
 :root {
   color-scheme: light dark;
 }
+
+/*
+ * A clear, consistent focus ring for keyboard users. :focus-visible means
+ * "focused in a way the user should see" (Tab, arrow keys), so mouse clicks
+ * don't leave rings behind. Browsers' own rings vary and can be faint on
+ * colored buttons; this one is the same everywhere.
+ */
+:focus-visible {
+  outline: 3px solid var(--color-teal-600);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: var(--color-teal-300);
+  }
+}

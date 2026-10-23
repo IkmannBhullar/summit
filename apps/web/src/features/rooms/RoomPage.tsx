@@ -14,6 +14,7 @@ import { TeamMountain } from "./TeamMountain";
 import { TeamTimer } from "./TeamTimer";
 import { useRoom } from "./useRoom";
 import { useTeamAlerts } from "./useTeamAlerts";
+import { usePageTitle } from "../../lib/usePageTitle";
 
 /** How often the clocks re-render. Each render recomputes the time from endsAt. */
 const TICK_MS = 250;
@@ -25,6 +26,8 @@ const TICK_MS = 250;
 export function RoomPage() {
   const { code = "" } = useParams();
   const parsed = RoomCodeSchema.safeParse(code);
+  // Set here, once: effects run child-first, so a title set by a child would be overwritten.
+  usePageTitle(parsed.success ? `Rope team ${formatRoomCode(parsed.data)}` : "Rope team");
 
   if (!parsed.success) return <RoomProblem message="That isn't a room code." />;
   if (parsed.data !== code) return <Navigate to={`/rooms/${parsed.data}`} replace />;

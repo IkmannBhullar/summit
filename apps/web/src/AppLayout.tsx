@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, Outlet } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, Outlet, useLocation } from "react-router";
 import { chime } from "./features/alerts/chime";
 import { SoundToggle } from "./features/alerts/SoundToggle";
 import { useAudioUnlock } from "./features/alerts/useAudioUnlock";
@@ -25,11 +25,34 @@ export function AppLayout() {
 
   const shell: ShellContext = { settings, preferences, updatePreferences };
 
+  // After moving to another page, put keyboard focus at the start of its
+  // content (where the skip link goes), so keyboard and screen-reader users
+  // begin at the top of the new page, not wherever the old link was.
+  // Comparing paths (not "skip the first run") stays correct when
+  // StrictMode runs effects twice on mount.
+  const { pathname } = useLocation();
+  const content = useRef<HTMLDivElement>(null);
+  const previousPath = useRef(pathname);
+  useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    content.current?.focus();
+  }, [pathname]);
+
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Safe-area padding: when installed on a phone with a notch or
           home bar, keep content out from under them (needs
           viewport-fit=cover in index.html). */}
+      {/* The first thing Tab reaches: jump past the header. It waits just
+          above the top of the screen and slides into view when focused.
+          (Tailwind's sr-only/not-sr-only would reset its padding.) */}
+      <a
+        href="#content"
+        className="absolute top-2 left-2 z-50 -translate-y-20 rounded-lg bg-white px-4 py-2 font-medium text-teal-800 shadow-lg focus:translate-y-0 dark:bg-slate-900 dark:text-teal-300"
+      >
+        Skip to content
+      </a>
       <header className="flex items-center justify-between px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
         <h1 className="text-2xl font-bold tracking-tight text-teal-700 dark:text-teal-400">
           <Link to="/">Summit</Link>
@@ -56,7 +79,16 @@ export function AppLayout() {
         </div>
       </header>
 
-      <Outlet context={shell} />
+      {/* tabIndex={-1}: focusable by script (above) and the skip link, but
+          not a stop when pressing Tab. */}
+      <div
+        id="content"
+        ref={content}
+        tabIndex={-1}
+        className="flex flex-1 flex-col focus:outline-none"
+      >
+        <Outlet context={shell} />
+      </div>
 
       <SettingsDialog
         open={settingsOpen}
