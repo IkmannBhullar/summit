@@ -7,11 +7,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://summit-api.onrender.com/api/:path*"
+      "destination": "https://summit-api-pv6v.onrender.com/api/:path*"
     },
     {
       "source": "/socket.io/:path*",
-      "destination": "https://summit-api.onrender.com/socket.io/:path*"
+      "destination": "https://summit-api-pv6v.onrender.com/socket.io/:path*"
     },
     {
       "source": "/((?!api/|socket\\.io/)[^.]*)",
